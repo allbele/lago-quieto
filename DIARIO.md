@@ -4,10 +4,10 @@
 > Status atual sempre na seção **Agora**.
 
 ## Agora
-- **Fase atual:** 3 — Teste & polimento no Chrome (3 testadores → verificação → correções → screenshots) — *em execução*
+- **Fase atual:** 4 — Publicação ✅ **JOGO NO AR: https://allbele.github.io/lago-quieto/** · Fase 5 (Steam/Electron) a iniciar
 - **Jogo:** **Lago Quieto** (*Quiet Lake*) — "Jogue uma pedra. O lago faz o resto." · slug `lago-quieto`
 - **Você precisa fazer:** nada.
-- **Próximo entregável:** pasta `web/` jogável localmente → teste no Chrome → link público `https://allbele.github.io/lago-quieto`.
+- **Próximo entregável:** pacote Electron + material de loja Steam em `steam/` e `store/` (não depende de você até ter a conta Steamworks).
 
 ---
 
@@ -29,6 +29,8 @@
 - **Incidente (noite de 25→26/08):** o Mac entrou em modo de descanso durante a Fase 2; o workflow travou no revisor zen após 8/10 agentes concluírem (núcleo, áudio, 4 entidades, integrador com Chrome + console limpo, revisor de bugs). Retomado em 26/08 do cache — só revisor zen + corretor rodam de novo. Lição: manter o Mac acordado durante workflows longos (ex.: `caffeinate`).
 - **Fase 2 concluída (26/08, 10 agentes, ~1,2M tokens).** `web/` jogável: núcleo (`game.js` ~28 KB), `audio.js` (tudo sintetizado), `platform.js`, 8 módulos em `ent/`. Integrador testou no Chrome: 12 desbloqueios, 5 temas, eco, resize, amanhecer — console limpo, 60 FPS. Bugs notáveis corrigidos: lua/vagalumes invisíveis após reload, achievement "Só Olhando" dado no 1º frame, névoa/aurora fortes demais, rAF duplicado ao voltar de aba oculta, save corrompido não sanitizado. 21 achados dos revisores aplicados. Frágil ainda: aurora legível como faixas, vagalumes discretos, sapo perto da barra de ícones em telas baixas.
 - **Fase 3 iniciada:** workflow `lago-quieto-test`.
+- **Fase 3 concluída (26/08, 30 agentes, ~1,3M tokens, 57 min).** 3 testadores (primeira vez / stress / direção de arte) → 25 achados → 22 verificações céticas → 12 confirmados e corrigidos: save em array/tipos errados, `LQ.reset()`, barra não some com cursor sobre ela, temas entram em fade (sem pop), tema tinta com lua/vagalumes em grafite, vagalumes só pousam na fase 6, peixes/sapo/lírios reposicionam no resize, lírios evitam a barra de ícones, aurora mais borrada e tênue. 8 screenshots 1280×720 em `store/screenshots/`.
+- **Fase 4 concluída (26/08).** Repo público `https://github.com/allbele/lago-quieto` (branch main). GitHub Pages só serve `/` ou `/docs` → raiz com `index.html` redirecionando para `web/` + `.nojekyll`. Publicado em **https://allbele.github.io/lago-quieto/** (ativo 50 s após o push). `scripts/deploy-pages.sh` republica com um comando.
 - Este diário criado a pedido do usuário: "salva em um .md também, atualizado dinamicamente, com lembranças do que já foi, por onde passou".
 
 ---
