@@ -2,7 +2,10 @@
 // O jogo nunca sabe onde roda — só fala com LQ.Platform.
 window.LQ = window.LQ || {};
 LQ.Platform = (function(){
-  const KEY = 'lagoquieto';
+  const KEY = 'lagoquieto'; // save padrão (zen); o idle passa 'lagoquieto.idle'
+  // Mapa key localStorage → arquivo Steam Cloud: 'lagoquieto' → save.json, 'lagoquieto.idle' → save-idle.json
+  const CLOUD_FILES = { 'lagoquieto': 'save.json', 'lagoquieto.idle': 'save-idle.json' };
+  const cloudFile = key => CLOUD_FILES[key] || (key + '.json');
   const ACH_KEY = 'lagoquieto.ach'; // espelho local dos achievements (útil para depurar e para merge)
 
   // Build Steam (Electron): o preload.js expõe `window.steamBridge`
@@ -51,19 +54,24 @@ LQ.Platform = (function(){
         try { steam.achievement && steam.achievement.activate(STEAM_IDS[id] || id); } catch (e) {}
       }
     },
-    saveCloud(json){
-      try { localStorage.setItem(KEY, json); } catch (e) {}
-      if (bridge){ try { bridge.cloudSave(json); } catch (e) {} }
+    // saveCloud(json, key): key = 'lagoquieto' (zen, padrão) | 'lagoquieto.idle'. Sempre grava em
+    // localStorage; na Steam também no arquivo de CLOUD_FILES (bridge recebe o nome como 2º arg).
+    saveCloud(json, key){
+      key = key || KEY;
+      try { localStorage.setItem(key, json); } catch (e) {}
+      if (bridge){ try { bridge.cloudSave(json, cloudFile(key)); } catch (e) {} }
       else if (steam){
-        try { steam.cloud && steam.cloud.writeFile('save.json', json); } catch (e) {}
+        try { steam.cloud && steam.cloud.writeFile(cloudFile(key), json); } catch (e) {}
       }
     },
-    loadCloud(){
+    loadCloud(key){
+      key = key || KEY;
+      const file = cloudFile(key);
       let local = null, cloud = null;
-      try { local = localStorage.getItem(KEY); } catch (e) {}
-      if (bridge){ try { cloud = bridge.cloudLoad() || null; } catch (e) {} }
+      try { local = localStorage.getItem(key); } catch (e) {}
+      if (bridge){ try { cloud = bridge.cloudLoad(file) || null; } catch (e) {} }
       else if (steam){
-        try { cloud = steam.cloud && steam.cloud.fileExists('save.json') ? steam.cloud.readFile('save.json') : null; } catch (e) {}
+        try { cloud = steam.cloud && steam.cloud.fileExists(file) ? steam.cloud.readFile(file) : null; } catch (e) {}
       }
       if (!cloud) return local;
       try {
@@ -72,6 +80,7 @@ LQ.Platform = (function(){
       } catch (e) { return local; }
     },
     merge,
-    STEAM_IDS
+    STEAM_IDS,
+    CLOUD_FILES
   };
 })();

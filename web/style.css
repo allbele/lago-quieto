@@ -5,16 +5,19 @@ body.nocursor,body.nocursor *{cursor:none!important}
 
 #lake{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
 
-/* Barra inferior */
-#ui{position:fixed;left:0;right:0;bottom:18px;display:flex;justify-content:center;gap:14px;
-  pointer-events:none;opacity:1;transition:opacity 1s ease}
+/* Barra inferior: até 7 botões (som, tela cheia, tema, coleção, eco, modo, loja) */
+:root{--ico:#e9f2ff;--ico-size:40px;--ui-gap:clamp(6px,2vw,14px);--ui-pad:calc(10px + env(safe-area-inset-bottom,0px))}
+#ui{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;align-items:center;gap:var(--ui-gap);
+  padding:6px clamp(4px,2vw,16px) var(--ui-pad);flex-wrap:nowrap;
+  pointer-events:none;opacity:1;transform:none;will-change:opacity;transition:opacity 1s ease}
 body.uihidden #ui{opacity:0}
-.ico{pointer-events:auto;width:40px;height:40px;border:0;background:transparent;padding:8px;cursor:pointer;
+.ico{pointer-events:auto;flex:0 0 auto;width:var(--ico-size);height:var(--ico-size);border:0;background:transparent;padding:8px;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;line-height:0;
   opacity:.6;transition:opacity .3s ease}
 .ico:hover,.ico:focus-visible{opacity:1;outline:none}
-:root{--ico:#e9f2ff}
-.ico svg{width:100%;height:100%;fill:none;stroke:var(--ico,#e9f2ff);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.ico svg{display:block;width:100%;height:100%;fill:none;stroke:var(--ico,#e9f2ff);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 body.uihidden .ico{pointer-events:none}
+@media (max-width:420px){:root{--ico-size:36px}.ico{padding:7px}}
 
 /* Estado do ícone de som */
 #btn-sound .off{display:none}
@@ -22,11 +25,12 @@ body.muted #btn-sound .on{display:none}
 body.muted #btn-sound .off{display:inline}
 body.eco #btn-eco{opacity:1}
 
-/* Coleção: faixa dos moradores acordados */
-#collection{position:fixed;left:0;right:0;bottom:70px;display:flex;justify-content:center;gap:16px;
+/* Coleção: faixa dos moradores acordados, logo acima da barra (não sobrepõe) */
+#collection{position:fixed;left:0;right:0;bottom:calc(var(--ui-pad) + var(--ico-size) + 18px);display:flex;justify-content:center;align-items:center;
+  gap:clamp(8px,2.5vw,16px);flex-wrap:wrap;padding:0 clamp(8px,3vw,24px);
   pointer-events:none;opacity:0;transform:translateY(6px);transition:opacity .8s ease,transform .8s ease}
 #collection.open{opacity:1;transform:none}
-body.uihidden #collection{opacity:0}
+body.uihidden #collection{opacity:0;transform:translateY(6px)}
 #collection svg{width:26px;height:26px;fill:none;stroke:var(--ico,#e9f2ff);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;opacity:.7}
 #collection svg.new{animation:born 4s ease forwards}
 @keyframes born{from{opacity:0;transform:translateY(4px)}to{opacity:.7;transform:none}}

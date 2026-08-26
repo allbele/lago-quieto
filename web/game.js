@@ -19,7 +19,7 @@ window.LQ = window.LQ || {};
   }
   // Hash determinístico barato (0..1) por índice inteiro — jitter estável entre frames
   function hash(i){
-    let h = (i | 0) * 2654435761; h ^= h >>> 15; h = (h * 2246822519) | 0; h ^= h >>> 13;
+    let h = Math.imul(i | 0, 2654435761); h ^= h >>> 15; h = Math.imul(h, 2246822519); h ^= h >>> 13;
     return (h >>> 0) / 4294967296;
   }
 
@@ -718,7 +718,7 @@ window.LQ = window.LQ || {};
   }
 
   // ---------- Loop ----------
-  let last = 0, saveTimer = 0, unlockTimer = 0, hiddenAt = 0, running = false;
+  let last = 0, saveTimer = 0, unlockTimer = 0, hiddenAt = 0, hiddenSince = 0, running = false;
   function frame(now){
     if (!running) return;
     requestAnimationFrame(frame);
@@ -747,11 +747,13 @@ window.LQ = window.LQ || {};
   }
   function onVisibility(){
     if (document.hidden){
-      running = false; hiddenAt = Date.now(); save();
+      running = false; hiddenAt = Date.now(); if (!hiddenSince) hiddenSince = hiddenAt; save();
     } else {
       // Volta: avança relógio (cap 8 h) e deixa a cascata mostrar o que acordou
+      // hiddenAt é consumido pelo save (pagehide); hiddenSince guarda a ausência inteira p/ onOffline
       let away = 0;
-      if (hiddenAt){ away = (Date.now() - hiddenAt) / 1000; game.state.totalTime += Math.min(away, OFFLINE_CAP); hiddenAt = 0; }
+      if (hiddenAt){ game.state.totalTime += Math.min((Date.now() - hiddenAt) / 1000, OFFLINE_CAP); hiddenAt = 0; }
+      if (hiddenSince){ away = (Date.now() - hiddenSince) / 1000; hiddenSince = 0; }
       checkUnlocks();
       if (away > 0) call('onOffline', away, game);
       if (running) return; // já há um encadeamento de rAF
