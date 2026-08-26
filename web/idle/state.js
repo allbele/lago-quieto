@@ -3,7 +3,8 @@ window.LQ = window.LQ || {};
 LQ.IdleState = (function(){
   'use strict';
   const num = (v, d) => { v = Number(v); return Number.isFinite(v) ? v : d; };
-  const pos = v => Math.max(0, num(v, 0));
+  const MAXV = 1e300; // teto numérico (nunca chega a Infinity/NaN)
+  const pos = v => Math.min(MAXV, Math.max(0, num(v, 0)));
   const int = v => Math.max(0, Math.floor(num(v, 0)));
   const idOk = x => typeof x === 'string' && /^[a-z0-9_]{1,40}$/.test(x);
 

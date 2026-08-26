@@ -68,6 +68,8 @@ window.LQ = window.LQ || {};
   const fmtGain = a => a < 1 ? a.toFixed(1) : fmt(a);
   const setText = (e, t) => { if (e.textContent !== t) e.textContent = t; }; // evita invalidar estilo sem mudança
   const HINT_KEY = 'lagoquieto.idle.shopSeen';
+  const HINT_HOLD = 10;     // s que a dica segura a barra visível (por sessão)
+  const FLOAT_LIFE = 1.4;   // s de vida do floater "+N"
   let shopSeen = false; try { shopSeen = localStorage.getItem(HINT_KEY) === '1'; } catch (e) {}
 
   // ---------- SVG helpers ----------
@@ -89,7 +91,7 @@ window.LQ = window.LQ || {};
   // ---------- entidade ----------
   const H = {
     hud: null, shop: null, list: null, ups: null, prest: null, toast: null,
-    qty: 1, open: false, throttle: 0, toastT: 0, dirty: true,
+    qty: 1, open: false, throttle: 0, toastT: 0, dirty: true, hintT: 0, hintOn: false,
     rows: {}, upRows: {},
     floats: [], // pool de floaters
     game: null,
@@ -157,14 +159,14 @@ window.LQ = window.LQ || {};
         r.appendChild(icon(g.icon));
         const mid = el('div', 'mid');
         const top = el('div', 'top'); const cnt = el('span', 'n', '0');
-        const cw = el('span', 'c'); cw.appendChild(pathIcon(RING)); const c = el('span', null, '0'); cw.appendChild(c); // anel = custo
+        const cw = el('span', 'c'); const q = el('span', 'q', ''); cw.appendChild(q); cw.appendChild(pathIcon(RING)); const c = el('span', null, '0'); cw.appendChild(c); // anel = custo; q = "×10"/"×N" quando qty≠1
         top.appendChild(cnt); top.appendChild(cw);
         const bar = el('div', 'bar'); const fill = el('i'); bar.appendChild(fill);
         const per = el('span', 'per', '');
         mid.appendChild(top); mid.appendChild(bar); mid.appendChild(per); r.appendChild(mid);
         r.addEventListener('click', () => this.clickGen(g));
         this.list.appendChild(r);
-        this.rows[g.id] = { r, cnt, c, fill, per };
+        this.rows[g.id] = { r, cnt, c, fill, per, q };
       }
       for (const u of D().upgrades){
         if (u.kind === 'mult' || u.cost == null) continue; // mult automáticos: sem custo, o motor aplica
@@ -201,9 +203,11 @@ window.LQ = window.LQ || {};
       best.age = 0; best.txt = txt; best.x = x; best.y = y; this.dirty = true;
     },
     // dica de descoberta: enquanto a loja nunca foi aberta e há algo comprável, segura a barra e pulsa o ícone
+    // (segura a barra só por HINT_HOLD s por sessão — depois o lago volta a ficar limpo; o ícone segue pulsando ao acordar)
     hint(on){
       const b = document.getElementById('btn-shop'); if (!b) return;
-      if (on){ if (this.game.ui) this.game.ui.wake(); }
+      this.hintOn = on;
+      if (on && this.hintT < HINT_HOLD){ if (this.game.ui) this.game.ui.wake(); }
       if (b.classList.contains('hint') !== on) b.classList.toggle('hint', on);
     },
 
@@ -232,7 +236,8 @@ window.LQ = window.LQ || {};
 
     update(dt, game){
       if (game.mode !== 'idle' || !this.hud) return;
-      for (const f of this.floats) if (f.age < 1) f.age += dt / 1.1;
+      for (const f of this.floats) if (f.age < 1) f.age += dt / FLOAT_LIFE;
+      if (this.hintOn) this.hintT += dt;
       if (this.toastT > 0){ this.toastT -= dt; if (this.toastT <= 0) this.toast.classList.remove('show'); }
       this.throttle += dt;
       if (this.throttle >= 0.1){ this.throttle = 0; this.render(game, false); }
@@ -260,7 +265,7 @@ window.LQ = window.LQ || {};
         if (!vis) continue;
         let q = this.qty === 'max' ? Math.max(1, maxAffordable(g, n, cur)) : this.qty;
         const c = cost(g, n, q);
-        setText(row.cnt, String(n)); setText(row.c, fmt(c));
+        setText(row.cnt, String(n)); setText(row.c, fmt(c)); setText(row.q, q > 1 ? '×' + q : '');
         const w = Math.min(100, cur / c * 100);
         if (Math.abs(w - (row.w || 0)) >= 0.5 || w === 100 && row.w !== 100){ row.w = w; row.fill.style.width = w.toFixed(1) + '%'; }
         row.r.classList.toggle('can', cur >= c);
@@ -284,11 +289,14 @@ window.LQ = window.LQ || {};
       let any = false; for (const f of this.floats) if (f.age < 1){ any = true; break; }
       if (!any) return;
       ctx.save();
-      ctx.font = '12px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = game.palette.light;
-      ctx.shadowColor = 'rgba(5,9,20,.8)'; ctx.shadowBlur = 3; // contorno suave: legível sobre anéis claros
+      // tema claro (ink: lightBlend 'multiply'): texto escuro com halo claro; senão claro com halo escuro
+      const lightTheme = game.lightBlend === 'multiply';
+      ctx.font = '13px system-ui, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillStyle = lightTheme ? (game.palette.dark || '#1a1a1a') : game.palette.light;
+      ctx.shadowColor = lightTheme ? 'rgba(255,255,255,.9)' : 'rgba(5,9,20,.85)'; ctx.shadowBlur = 3; // contorno suave: legível sobre anéis
       for (const f of this.floats){
         if (f.age >= 1) continue;
-        ctx.globalAlpha = 0.75 * (1 - f.age);
+        ctx.globalAlpha = 0.9 * (1 - f.age);
         ctx.fillText(f.txt, f.x, f.y - 18 - f.age * 22);
       }
       ctx.restore();

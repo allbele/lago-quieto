@@ -7,6 +7,11 @@ LQ.Idle = (function(){
   const D = () => LQ.IdleData;
   let game = null;
   const S = () => (game && game.state && game.state.idle) || null;
+  const MAXV = 1e300; // teto de cur/life (evita Infinity → HUD '0' e save zerado no migrate)
+  function clampState(s){
+    if (!Number.isFinite(s.cur) || s.cur > MAXV) s.cur = Number.isNaN(s.cur) ? 0 : Math.min(MAXV, Math.max(0, s.cur));
+    if (!Number.isFinite(s.life) || s.life > MAXV) s.life = Number.isNaN(s.life) ? 0 : Math.min(MAXV, Math.max(0, s.life));
+  }
 
   // ---------- Emissor simples ----------
   const listeners = {};
@@ -113,7 +118,7 @@ LQ.Idle = (function(){
   function prestigePoints(){
     const s = S(); if (!s) return 0;
     const K = (D().prestige && D().prestige.K) || 1.5e9;
-    return Math.max(0, Math.floor(Math.sqrt(s.life / K)) - s.prest.pts);
+    return Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, Math.floor(Math.sqrt(s.life / K)) - s.prest.pts));
   }
   // Parte de estado do prestígio (a cena/tinta ficam em idle/prestige.js). Mantém: prest, life, stats, goals.
   function claimPrestige(){
@@ -183,6 +188,7 @@ LQ.Idle = (function(){
       }
       const gain = tr * dt;
       s.cur += gain; s.life += gain;
+      clampState(s);
       if (tr > s.stats.bestRate) s.stats.bestRate = tr;
       goalTimer += dt;
       if (goalTimer >= 1){ goalTimer = 0; checkGoals(); }
@@ -194,7 +200,9 @@ LQ.Idle = (function(){
         while (ringAcc >= 1 && n < 3){
           ringAcc -= 1; n++;
           // com a loja aberta os anéis nascem só na área visível do lago
-          const x = 20 + g.rand() * Math.max(40, g.W - 40 - (shopOpen ? 260 : 0));
+          // largura real do painel (a ≤600 px ele ocupa 100%) → anéis nunca nascem debaixo dele
+          let sw = 0; if (shopOpen){ const el = document.getElementById('shop'); sw = el ? el.offsetWidth : 260; }
+          const x = 20 + g.rand() * Math.max(40, g.W - 40 - sw);
           const y = g.horizonY + 20 + g.rand() * Math.max(10, g.H - g.horizonY - 60);
           g.spawnRipple(x, y, { strength: U.clamp(0.3 + Math.log10(Math.max(1, tr)) / 8, 0.3, 0.9) });
         }
@@ -205,7 +213,7 @@ LQ.Idle = (function(){
     onImpact(p, g){
       if (g.mode !== 'idle' || prestigeBusy()) return; const s = S(); if (!s) return; // durante os sinos do prestígio nada soma
       const amt = clickPower() * (p && p.strength ? p.strength : 1);
-      s.cur += amt; s.life += amt; s.stats.clicks++;
+      s.cur += amt; s.life += amt; s.stats.clicks++; clampState(s);
       emit('currency', { x: p ? p.x : g.W / 2, y: p ? p.y : g.horizonY + 40, amount: amt, source: p && p.source });
     },
     onOffline(sec, g){
@@ -213,7 +221,7 @@ LQ.Idle = (function(){
       sec = Math.max(0, Number(sec) || 0);
       const eff = Math.min(sec, offlineCap());
       const earned = totalRate() * eff * 0.5;
-      if (earned > 0){ s.cur += earned; s.life += earned; s.stats.offlineEarned += earned; }
+      if (earned > 0){ s.cur += earned; s.life += earned; s.stats.offlineEarned += earned; clampState(s); }
       s.lastTick = Date.now(); // evita creditar a mesma ausência de novo no próximo update
       if (sec >= 30) emit('offline', { sec, earned, capped: sec > eff });
     },

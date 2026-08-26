@@ -642,7 +642,18 @@ window.LQ = window.LQ || {};
       }
       else if (a === 'coll'){ UI.collOpen = !UI.collOpen; document.getElementById('collection').classList.toggle('open', UI.collOpen); }
       else if (a === 'eco'){ s.eco = !s.eco; resize(); }
-      else if (a === 'mode'){ LQ.switchMode(game.mode === 'idle' ? 'zen' : 'idle'); return; }
+      else if (a === 'mode'){
+        // confirmação: 1º clique arma (ícone aceso por 2 s), 2º clique troca — evita trocar por engano ao jogar pedra perto da barra
+        const b = document.getElementById('btn-mode');
+        if (!UI.modeArmed){
+          UI.modeArmed = true; if (b) b.classList.add('arm');
+          clearTimeout(UI.modeTimer);
+          UI.modeTimer = setTimeout(() => { UI.modeArmed = false; if (b) b.classList.remove('arm'); }, 2000);
+          return;
+        }
+        clearTimeout(UI.modeTimer); UI.modeArmed = false; if (b) b.classList.remove('arm');
+        LQ.switchMode(game.mode === 'idle' ? 'zen' : 'idle'); return;
+      }
       else if (a === 'shop'){ game.emit('shopToggle', null); } // idle/hud.js implementa onShopToggle
       UI.applyClasses(); save();
     },
@@ -689,10 +700,22 @@ window.LQ = window.LQ || {};
   // Troca de modo: salva o atual, grava a escolha e recarrega (cada modo tem seu save)
   LQ.switchMode = function(m){
     if (m !== 'zen' && m !== 'idle') return;
-    if (game.state) save();
+    if (game.state){
+      save();
+      // idle → zen: o tempo passado no zen NÃO é ausência do idle (não vira ganho offline na volta)
+      if (game.mode === 'idle' && m === 'zen'){
+        game.state.lastSeen = 0;
+        try {
+          const json = JSON.stringify(game.state);
+          if (LQ.Platform && LQ.Platform.saveCloud) LQ.Platform.saveCloud(json, SAVE_KEY); else localStorage.setItem(SAVE_KEY, json);
+        } catch (e) {}
+      }
+    }
     writeMode(m);
     resetting = true; // o save de unload não regrava por cima
-    location.reload();
+    // fade curto antes do reload (sem corte seco)
+    document.body.style.transition = 'opacity .35s ease'; document.body.style.opacity = '0';
+    setTimeout(() => location.reload(), 360);
   };
 
   // ---------- Desenho por camadas ----------

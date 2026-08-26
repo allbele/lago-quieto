@@ -43,7 +43,7 @@ window.LQ = window.LQ || {};
   function rotateTheme(runs){
     const list = LQ.themeList || ['night'];
     if (runs < 5 || !game || !game.state) return;
-    const th = list[(runs - 5) % list.length];
+    const th = list[(runs - 5 + 1) % list.length]; // +1: a run 5 já muda de tema (índice 0 seria 'night' = run 0)
     if (game.state.theme !== th){
       game.state.theme = th;
       if (game.audio && game.audio.setTheme) game.audio.setTheme(th);

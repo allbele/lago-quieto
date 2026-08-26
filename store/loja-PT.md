@@ -16,6 +16,9 @@ Você está sentado na margem de um lago à noite, jogando pedrinhas na água se
 
 [b]Não há objetivo, pontuação ou derrota.[/b] O jogo nunca pede nada — ele apenas responde. Quanto mais tempo você passa ali, mais vivo o lago fica. E ele continua vivo quando você fecha a janela: ao voltar, uma cascata de anéis conta o que aconteceu enquanto você não estava.
 
+[h3]Dois modos[/h3]
+Ao abrir, você escolhe entre 🌙 [b]Zen[/b] — só clicar e observar, sem números, do jeito original — e ⚡ [b]Idle[/b], um clicker de progressão com geradores (vagalumes, peixes, lírios…), upgrades e prestígio ao amanhecer. Os dois compartilham o mesmo lago; troque quando quiser.
+
 [h3]O que você vai encontrar[/h3]
 [list]
 [*][b]Cada clique é uma nota.[/b] Anéis na água tocam uma escala suave; cliques em sequência formam melodias acidentais.
@@ -23,6 +26,7 @@ Você está sentado na margem de um lago à noite, jogando pedrinhas na água se
 [*][b]Modo ambiente.[/b] Deixe aberto: a interface some, o cursor desaparece e o lago vira uma paisagem sonora viva.
 [*][b]Áudio 100% sintetizado.[/b] Nenhum sample — cada plop, grilo e nota é gerado em tempo real.
 [*][b]Zero texto na tela.[/b] Sem tutorial, sem números, sem notificações. Só ícones e água.
+[*][b]Modo Idle opcional.[/b] Geradores, upgrades e prestígio para quem quer ver o lago crescer em números — ou fique no Zen e nunca veja um.
 [/list]
 
 [h3]O que a versão Steam adiciona[/h3]
@@ -43,6 +47,7 @@ O Lago Quieto é [b]gratuito e completo na web[/b]: [url=https://allbele.github.
 3. Progressão idle gentil: o lago segue vivo enquanto você está fora.
 4. Áudio inteiramente sintetizado e visual em Canvas 2D, leve em qualquer máquina.
 5. Extras Steam: 12 conquistas, 4 temas, cloud save e modo papel de parede.
+6. Dois modos: 🌙 Zen (só clicar e observar) e ⚡ Idle (geradores, upgrades, prestígio).
 
 ## Requisitos de sistema
 

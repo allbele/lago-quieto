@@ -36,7 +36,7 @@ LQ.IdleUtil = (function(){
   // Máximo de unidades pagáveis com `cur` (log + verificação). Aceita maxAffordable(gen, owned, cur).
   function maxAffordable(base, growth, owned, cur){
     if (base && typeof base === 'object'){ cur = owned; owned = growth; growth = base.growth; base = base.base; }
-    if (!(cur > 0) || !(base > 0) || !(growth >= 1)) return 0; // dados inválidos → nada comprável
+    if (!Number.isFinite(cur) || !(cur > 0) || !(base > 0) || !(growth >= 1)) return 0; // dados inválidos/Infinity → nada comprável
     const first = base * Math.pow(growth, owned);
     if (cur < first) return 0;
     let n;

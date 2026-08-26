@@ -30,8 +30,10 @@
   const shoot = { active: false, x: 0, y: 0, vx: 0, vy: 0, age: 0 };
 
   // ---------- aurora ----------
-  let auroraCv = null, auroraCtx = null;
-  let noiseCv = null;      // sprite 64x64 de ruído azul-frio (quebra o banding das faixas escaladas)
+  let auroraCv = null, auroraCtx = null, auroraAt = -1, auroraK = -1;
+  const AURORA_HZ = 15;    // repinta o offscreen a 15 Hz (o blur do upscale esconde o passo)
+  let noiseCv = null;      // sprite 256x256 de ruído azul-frio (quebra o banding das faixas escaladas)
+  const NOISE_T = 256;
   const OVERLAY_OK = (function(){ // 'overlay' suportado? senão cai em 'lighter'
     try { const c = document.createElement('canvas').getContext('2d'); c.globalCompositeOperation = 'overlay'; return c.globalCompositeOperation === 'overlay'; } catch (e){ return false; }
   })();
@@ -120,13 +122,13 @@
   function ensureAurora(game){
     const w = Math.max(48, Math.round(game.W / 8)), h = Math.max(32, Math.round(game.horizonY / 2)); // 1/8: mais blur de graça
     if (!auroraCv){ auroraCv = document.createElement('canvas'); auroraCtx = auroraCv.getContext('2d'); }
-    if (auroraCv.width !== w || auroraCv.height !== h){ auroraCv.width = w; auroraCv.height = h; }
+    if (auroraCv.width !== w || auroraCv.height !== h){ auroraCv.width = w; auroraCv.height = h; auroraAt = -1; }
   }
   // Sprite de ruído pré-gerado (64x64, azul frio, pixels aleatórios) — desenhado em tile sobre a aurora
   function ensureNoise(){
     if (noiseCv) return noiseCv;
-    noiseCv = document.createElement('canvas'); noiseCv.width = noiseCv.height = 64;
-    const g = noiseCv.getContext('2d'), img = g.createImageData(64, 64), d = img.data, r = mkRand(9091);
+    noiseCv = document.createElement('canvas'); noiseCv.width = noiseCv.height = NOISE_T;
+    const g = noiseCv.getContext('2d'), img = g.createImageData(NOISE_T, NOISE_T), d = img.data, r = mkRand(9091);
     for (let i = 0; i < d.length; i += 4){
       const v = 120 + Math.floor(r() * 135);
       d[i] = v * 0.7; d[i + 1] = v * 0.85; d[i + 2] = v; d[i + 3] = 255;
@@ -141,15 +143,20 @@
     ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
     ctx.globalCompositeOperation = OVERLAY_OK ? 'overlay' : 'lighter';
     ctx.globalAlpha = a;
-    for (let yy = y; yy < y + h; yy += 64) for (let xx = x; xx < x + w; xx += 64) ctx.drawImage(n, xx, yy);
+    for (let yy = y; yy < y + h; yy += NOISE_T) for (let xx = x; xx < x + w; xx += NOISE_T) ctx.drawImage(n, xx, yy);
     ctx.restore();
   }
   // Redesenha o offscreen da aurora: 6 faixas com alpha senoidal; cada coluna é afunilada em
   // 5 rects (alpha 0.25/0.6/1/0.6/0.25) para não haver borda dura; ondas com fase/frequência
   // distintas por faixa, janela horizontal suave e faixas de baixo esmaecendo (sem 'degrau').
   const TAPER = [0.25, 0.6, 1, 0.6, 0.25];
+  // qualidade do upscale da aurora: 'high' até ~1600 px de largura; acima disso 'low' (custo por área)
+  const auroraQuality = game => game.W > 1600 ? 'low' : 'high';
   function paintAurora(game, k){
     ensureAurora(game);
+    // throttle: só repinta quando passou 1/AURORA_HZ s (ou k mudou bastante, p.ex. no fade de entrada)
+    if (auroraAt >= 0 && game.t - auroraAt < 1 / AURORA_HZ && Math.abs(k - auroraK) < 0.02) return;
+    auroraAt = game.t; auroraK = k;
     const g = auroraCtx, w = auroraCv.width, h = auroraCv.height, t = game.t;
     g.clearRect(0, 0, w, h);
     const cols = [game.palette.auroraG, game.palette.auroraP];
@@ -286,7 +293,8 @@
         const k = game.unlockFade('aurora') * night;
         if (k <= 0.01) return;
         paintAurora(game, k);
-        ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+        // upscale 8× de uma imagem já borrada: bilinear ('low') basta e custa ~40% menos em telas grandes
+        ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = auroraQuality(game);
         ctx.drawImage(auroraCv, 0, 0, W, hy * 0.7);
         drawNoise(ctx, 0, 0, W, Math.ceil(hy * 0.7), 0.02 * k);
       }
@@ -337,7 +345,7 @@
           if (ka > 0.01 && auroraCv){
             ctx.globalAlpha = 0.15 * night;
             ctx.save(); ctx.translate(0, hy); ctx.scale(1, -1);
-            ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+            ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = auroraQuality(game);
             ctx.drawImage(auroraCv, 0, -hy * 0.7, W, hy * 0.7);
             ctx.restore();
             drawNoise(ctx, 0, hy, W, Math.ceil(hy * 0.7), 0.01 * ka); // metade do alpha do céu
