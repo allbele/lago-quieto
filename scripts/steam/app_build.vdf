@@ -1,0 +1,24 @@
+// Lago Quieto — script de build do app para o SteamPipe (steamcmd +run_app_build).
+// PLACEHOLDERS a preencher (ver CHECKLIST-STEAMWORKS.md):
+//   <APPID>            -> App ID do jogo no Steamworks (ex.: 1234560)
+//   <DEPOTID_WINDOWS>  -> normalmente <APPID>+1
+//   <DEPOTID_MACOS>    -> normalmente <APPID>+2
+//   <DEPOTID_LINUX>    -> normalmente <APPID>+3
+// Os caminhos são resolvidos relativos a este arquivo (scripts/steam/).
+"AppBuild"
+{
+	"AppID"        "<APPID>"
+	"Desc"         "Lago Quieto — build automatizada"   // descrição exibida no painel Builds
+	"BuildOutput"  "../../steam/logs/"                  // logs e cache do SteamPipe
+	"ContentRoot"  "../../steam/dist/"                  // raiz do conteúdo (subpastas por plataforma)
+	"SetLive"      ""                                   // vazio = não publica em nenhuma branch; usar "beta" para testar
+	"Preview"      "0"                                  // 1 = simula o upload sem enviar
+	"Local"        ""
+
+	"Depots"
+	{
+		"<DEPOTID_WINDOWS>"  "depot_build_windows.vdf"
+		"<DEPOTID_MACOS>"    "depot_build_macos.vdf"
+		"<DEPOTID_LINUX>"    "depot_build_linux.vdf"
+	}
+}

@@ -1,0 +1,21 @@
+// Lago Quieto — depot macos. PLACEHOLDER: <DEPOTID_MACOS> (ver app_build.vdf / CHECKLIST-STEAMWORKS.md).
+// Conteúdo esperado em steam/dist/macos/ (gerado pelo empacotador Electron/Steamworks).
+"DepotBuild"
+{
+	"DepotID" "<DEPOTID_MACOS>"
+	// caminho relativo ao ContentRoot definido em app_build.vdf
+	"ContentRoot" "macos/"
+
+	"FileMapping"
+	{
+		"LocalPath" "*"          // tudo dentro de steam/dist/macos/
+		"DepotPath" "."          // vai para a raiz do depot
+		"recursive" "1"
+	}
+
+	// não enviar lixo de sistema/dev
+	"FileExclusion" "*.pdb"
+	"FileExclusion" "*.log"
+	"FileExclusion" ".DS_Store"
+	"FileExclusion" "Thumbs.db"
+}

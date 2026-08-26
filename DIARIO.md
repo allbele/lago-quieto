@@ -5,10 +5,10 @@
 
 ## Agora
 - **JOGO NO AR:** **https://allbele.github.io/lago-quieto/** · espelho Artifact: https://claude.ai/code/artifact/1211e100-54e0-4a88-8caf-2f0dd2c8e307
-- **Fase atual:** 5 — Steam (Electron wrapper + achievements + material de loja + scripts steamcmd) — *em execução*
+- **Fase atual:** 5 concluída ✅ — tudo pronto do lado dos agentes. **Aguardando só a conta Steamworks do usuário** (ver "Pendências").
 - **Jogo:** **Lago Quieto** (*Quiet Lake*) — "Jogue uma pedra. O lago faz o resto." · slug `lago-quieto`
 - **Você precisa fazer:** nada.
-- **Próximo entregável:** pacote Electron + material de loja Steam em `steam/` e `store/` (não depende de você até ter a conta Steamworks).
+- **Próximo entregável:** upload para a Steam — só depois de você criar a conta Steamworks e me passar o App ID / Depot IDs.
 
 ---
 
@@ -35,6 +35,7 @@
 - **Verificação pós-publicação (26/08):** aberto no Chrome em https://allbele.github.io/lago-quieto/ — redireciona para `web/`, pedras caem, anéis formam, console sem erros.
 - **Espelho Artifact publicado:** bundle de arquivo único (`store/bundle/lago-quieto.html`, 127 KB, CSS+JS inline) em https://claude.ai/code/artifact/1211e100-54e0-4a88-8caf-2f0dd2c8e307 (privado; compartilhável pelo menu da página).
 - **Fase 5 iniciada:** workflow `lago-quieto-steam` — 3 construtores (Electron+steamworks.js, material de loja/capsules, vdf+steamcmd+checklist Steamworks) + 1 verificador que abre o .app no Mac.
+- **Fase 5 concluída (26/08, 4 agentes, 7 min).** `steam/`: wrapper Electron (main.js, preload, steam.js com steamworks.js opcional, 12 achievements mapeados = mesmos ids que `game.js` emite, Steam Cloud com merge), build Mac gerado e **aberto com sucesso** (`steam/dist/mac-arm64/Lago Quieto.app` + x64, DMG/ZIP; prova em `store/screenshots/electron-mac.png`). `store/`: textos PT/EN em BBCode, 10 capsules validadas pixel a pixel (`CHECKLIST.md`), 12 ícones de achievement (cor + cinza), roteiro de trailer. `scripts/steam/`: `app_build.vdf` + 3 depots, `steam-upload.sh`, `CHECKLIST-STEAMWORKS.md` (passo a passo manual do usuário). Pendências técnicas: build Windows precisa de Wine ou máquina Windows; app sem assinatura Apple (ok dentro da Steam); placeholders <APPID>/<DEPOTID_*>.
 - Este diário criado a pedido do usuário: "salva em um .md também, atualizado dinamicamente, com lembranças do que já foi, por onde passou".
 
 ---
@@ -49,4 +50,4 @@
 | UI | só ícones, nenhum texto obrigatório | mood "não quero ler" |
 
 ## Pendências que dependem do usuário
-- [ ] (só quando quiser a Steam) criar conta em https://partner.steamgames.com/steamdirect, pagar US$100, W-8BEN, identidade → avisar quando aprovado.
+- [ ] (só quando quiser a Steam) seguir `scripts/steam/CHECKLIST-STEAMWORKS.md`: criar conta em https://partner.steamgames.com/steamdirect, pagar US$100, W-8BEN, identidade (1-5 dias) → criar o app → me passar **App ID** e **3 Depot IDs** + criar usuário de build. Depois disso os agentes fazem upload, página da loja e achievements. Lançamento só após 30 dias da taxa.

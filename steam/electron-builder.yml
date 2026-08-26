@@ -1,0 +1,66 @@
+# Configuração do electron-builder para Lago Quieto (Steam).
+appId: online.noraldinokatia.lagoquieto
+productName: Lago Quieto
+copyright: Copyright © 2026 Mateus
+directories:
+  output: dist
+  buildResources: build
+
+# Só o wrapper entra no asar; o jogo web vai como recurso extra (file:// funciona normal).
+files:
+  - main.js
+  - preload.js
+  - steam.js
+  - package.json
+  - "!dist"
+  - "!build"
+
+extraResources:
+  - from: ../web
+    to: web
+    filter:
+      - "**/*"
+      - "!audio-test.html"
+  - from: steam_appid.txt
+    to: steam_appid.txt
+
+# steamworks.js tem binários nativos; não empacotar no asar.
+asarUnpack:
+  - "node_modules/steamworks.js/**"
+
+npmRebuild: false
+
+mac:
+  category: public.app-category.games
+  icon: build/icon.icns
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+    - target: zip
+      arch: [x64, arm64]
+  identity: null      # sem assinatura
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  artifactName: "${productName}-${version}-mac-${arch}.${ext}"
+
+win:
+  icon: build/icon.ico
+  target:
+    - target: portable
+      arch: [x64]
+    - target: nsis
+      arch: [x64]
+  artifactName: "${productName}-${version}-win-${arch}.${ext}"
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+
+linux:
+  icon: build/icon.png
+  category: Game
+  target:
+    - target: AppImage
+      arch: [x64]
+  artifactName: "${productName}-${version}-linux-${arch}.${ext}"

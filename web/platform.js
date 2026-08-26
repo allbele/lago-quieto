@@ -5,13 +5,12 @@ LQ.Platform = (function(){
   const KEY = 'lagoquieto';
   const ACH_KEY = 'lagoquieto.ach'; // espelho local dos achievements (útil para depurar e para merge)
 
-  // TODO(steam): na build Electron/Steamworks, expor `window.steamworks` (steamworks.js) antes deste script:
-  //   const sw = require('steamworks.js'); const client = sw.init(APP_ID); window.steamworks = client;
-  // Então: achievement(id) → client.achievement.activate(STEAM_IDS[id]);
-  //        saveCloud(json) → client.cloud.writeFile('save.json', json);
-  //        loadCloud()     → client.cloud.fileExists('save.json') ? client.cloud.readFile('save.json') : null;
-  //        overlay do troféu → client.overlay.activateToWebPage / activate('Achievements').
-  const steam = (typeof window !== 'undefined' && window.steamworks) ? window.steamworks : null;
+  // Build Steam (Electron): o preload.js expõe `window.steamBridge`
+  // { achievement(id), cloudSave(json), cloudLoad() }. O mapeamento id → API name do
+  // Steamworks fica do lado Electron (steam/steam.js); aqui só delegamos.
+  // Compatibilidade: também aceita `window.steamworks` (cliente steamworks.js direto).
+  const bridge = (typeof window !== 'undefined' && window.steamBridge) ? window.steamBridge : null;
+  const steam = (!bridge && typeof window !== 'undefined' && window.steamworks) ? window.steamworks : null;
 
   // Ids internos (§8) → API names configurados no Steamworks (ajustar ao painel do parceiro).
   const STEAM_IDS = {
@@ -38,32 +37,32 @@ LQ.Platform = (function(){
   }
 
   return {
-    name: steam ? 'steam' : 'web',
+    name: (bridge || steam) ? 'steam' : 'web',
     wallpaper: false, // modo papel de parede (Steam): 15 fps — a build Steam liga isto
-    isSteam(){ return !!steam; },
+    isSteam(){ return !!(bridge || steam); },
     achievement(id){
       // browser: só espelha em localStorage (sem UI, sem texto)
       try {
         const l = localAch();
         if (l.indexOf(id) < 0){ l.push(id); localStorage.setItem(ACH_KEY, JSON.stringify(l)); }
       } catch (e) {}
-      if (steam){
-        // TODO(steam): steam.achievement.activate(STEAM_IDS[id] || id)
+      if (bridge){ try { bridge.achievement(id); } catch (e) {} }
+      else if (steam){
         try { steam.achievement && steam.achievement.activate(STEAM_IDS[id] || id); } catch (e) {}
       }
     },
     saveCloud(json){
       try { localStorage.setItem(KEY, json); } catch (e) {}
-      if (steam){
-        // TODO(steam): steam.cloud.writeFile('save.json', json)
+      if (bridge){ try { bridge.cloudSave(json); } catch (e) {} }
+      else if (steam){
         try { steam.cloud && steam.cloud.writeFile('save.json', json); } catch (e) {}
       }
     },
     loadCloud(){
       let local = null, cloud = null;
       try { local = localStorage.getItem(KEY); } catch (e) {}
-      if (steam){
-        // TODO(steam): cloud = steam.cloud.fileExists('save.json') ? steam.cloud.readFile('save.json') : null
+      if (bridge){ try { cloud = bridge.cloudLoad() || null; } catch (e) {} }
+      else if (steam){
         try { cloud = steam.cloud && steam.cloud.fileExists('save.json') ? steam.cloud.readFile('save.json') : null; } catch (e) {}
       }
       if (!cloud) return local;
