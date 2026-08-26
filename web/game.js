@@ -17,6 +17,11 @@ window.LQ = window.LQ || {};
       if (f) f.call(ents[i].def, a, b, c);
     }
   }
+  // Hash determinístico barato (0..1) por índice inteiro — jitter estável entre frames
+  function hash(i){
+    let h = (i | 0) * 2654435761; h ^= h >>> 15; h = (h * 2246822519) | 0; h ^= h >>> 13;
+    return (h >>> 0) / 4294967296;
+  }
 
   // ---------- Utilidades ----------
   const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
@@ -76,8 +81,17 @@ window.LQ = window.LQ || {};
   let cascadeTimer = 0, cascadeDegree = 0;
 
   // ---------- Estado salvo (§7) ----------
-  const SAVE_KEY = 'lagoquieto';
+  // Modo: 'zen' (save 'lagoquieto', intacto) | 'idle' (save 'lagoquieto.idle')
+  const MODE_KEY = 'lagoquieto.mode';
+  const SAVE_KEYS = { zen: 'lagoquieto', idle: 'lagoquieto.idle' };
+  let SAVE_KEY = SAVE_KEYS.zen;
   const OFFLINE_CAP = 8 * 3600;
+  function readMode(){
+    let m = null;
+    try { m = localStorage.getItem(MODE_KEY); } catch (e) {}
+    return m === 'zen' || m === 'idle' ? m : null;
+  }
+  function writeMode(m){ try { localStorage.setItem(MODE_KEY, m); } catch (e) {} }
   function fresh(){
     return { v: 1, ripples: 0, totalTime: 0, lastSeen: 0, unlocked: [],
       liliesBloomed: 0, theme: 'night', muted: false, eco: false,
@@ -101,12 +115,14 @@ window.LQ = window.LQ || {};
     s.unlocked = Array.isArray(s.unlocked) ? s.unlocked.filter(x => ids.indexOf(x) >= 0) : [];
     s.achievements = Array.isArray(s.achievements) ? s.achievements.filter(x => typeof x === 'string' && /^[a-z_]{1,32}$/.test(x)) : [];
     if (THEME_LIST.indexOf(s.theme) < 0) s.theme = 'night';
+    // s.idle: sub-estado do modo idle; o núcleo só preserva (idle/state.js migra por dentro)
+    if (s.idle !== undefined && (!s.idle || typeof s.idle !== 'object' || Array.isArray(s.idle))) delete s.idle;
     s.v = 1;
     return s;
   }
   function load(){
     let raw = null;
-    try { raw = LQ.Platform && LQ.Platform.loadCloud ? LQ.Platform.loadCloud() : localStorage.getItem(SAVE_KEY); } catch (e) {}
+    try { raw = LQ.Platform && LQ.Platform.loadCloud ? LQ.Platform.loadCloud(SAVE_KEY) : localStorage.getItem(SAVE_KEY); } catch (e) {}
     try { return migrate(raw ? JSON.parse(raw) : null); } catch (e) { return fresh(); }
   }
   let resetting = false;
@@ -117,7 +133,7 @@ window.LQ = window.LQ || {};
     if (hiddenAt){ s.totalTime += Math.min((Date.now() - hiddenAt) / 1000, OFFLINE_CAP); hiddenAt = Date.now(); }
     s.lastSeen = Date.now();
     const json = JSON.stringify(s);
-    if (LQ.Platform && LQ.Platform.saveCloud) LQ.Platform.saveCloud(json);
+    if (LQ.Platform && LQ.Platform.saveCloud) LQ.Platform.saveCloud(json, SAVE_KEY);
     else try { localStorage.setItem(SAVE_KEY, json); } catch (e) {}
   }
 
@@ -135,8 +151,18 @@ window.LQ = window.LQ || {};
     paletteVersion: 0,          // incrementa a cada mudança de game.palette
     lilyCount: 0,               // ent/lilies.js preenche
     lightBlend: 'lighter',      // ent/themes.js troca para 'multiply' em tema claro
-    rand, ease,
+    rand, ease, hash,
+    mode: 'zen',                // 'zen' | 'idle' (LQ.start define)
+    unlocksEnabled: true,       // idle: false → checkUnlocks não roda por tempo/anéis
     setPaletteOverride(obj){ paletteOverride = obj || null; },
+    // Evento genérico → hook 'on'+Nome nas entidades (ex.: emit('impact',p) → onImpact(p, game))
+    emit(name, payload){ call('on' + name.charAt(0).toUpperCase() + name.slice(1), payload, this); },
+    // Força um desbloqueio (entra na fila/cascata como os naturais)
+    forceUnlock(id){
+      if (!UNLOCKS.some(u => u.id === id)) return false;
+      if (this.state.unlocked.indexOf(id) >= 0 || pending.indexOf(id) >= 0) return false;
+      pending.push(id); return true;
+    },
     has(id){ return this.state.unlocked.indexOf(id) >= 0; },
     unlockFade(id){
       if (!this.has(id)) return 0;
@@ -388,6 +414,7 @@ window.LQ = window.LQ || {};
     spawnDrops(x, y, 3 + Math.floor(rand() * 4));
     s.ripples++;
     game.calm = Math.min(20, game.calm + 1);
+    game.emit('impact', { x, y, strength: 1, source: 'stone' });
     // Áudio: plop + nota (x → nota, y → oitava); nota só se >80 ms desde a anterior
     const nx = clamp(x / game.W, 0, 1), ny = clamp((y - game.horizonY) / (game.H - game.horizonY), 0, 1);
     // gain é relativo (1 = valor de projeto do §6; audio.js aplica os absolutos)
@@ -444,23 +471,22 @@ window.LQ = window.LQ || {};
   function drawMoonReflection(){
     if (game.moonR <= 0 || game.moonY > game.horizonY) return;
     const P = game.palette, hy = game.horizonY;
-    const len = Math.min(game.H - hy, game.moonR * 14);
+    const len = Math.min(game.H - hy, game.moonR * 8);
     const baseW = game.moonR * 2.2 + 40; // ~80 px
     ctx.fillStyle = P.light;
-    if (game.eco){
-      // eco: um único retângulo esmaecido
-      ctx.globalAlpha = 0.05;
-      ctx.fillRect(game.moonX - baseW * 0.5, hy, baseW, len);
-      ctx.globalAlpha = 1; return;
-    }
-    const slice = 3, n = Math.floor(len / slice);
-    const t = game.t;
+    // Cintilações: fatias com jitter (largura/alpha por hash) e ~30% puladas; eco = passo 8 px.
+    // Nunca uma coluna contínua nem um retângulo único.
+    const slice = game.eco ? 8 : 4, n = Math.floor(len / slice);
+    const t = game.t, tick = Math.floor(t * 6);
     for (let i = 0; i < n; i++){
+      const h1 = hash(i * 7 + 1), h2 = hash(i * 13 + tick);
+      if (h2 < 0.3) continue; // fatia apagada
       const y = hy + i * slice, f = 1 - i / n;
-      const w = baseW * (0.35 + 0.65 * (1 - f)) * (0.9 + 0.1 * Math.sin(y * 0.11 + t * 1.3));
+      const w = baseW * (0.35 + 0.65 * (1 - f)) * (0.6 + 0.4 * h1);
       const dx = Math.sin(y * 0.15 + t * 2) * 2 + rippleOffset(game.moonX, y);
-      ctx.globalAlpha = 0.10 * f * f + 0.008;
-      ctx.fillRect(game.moonX + dx - w * 0.5, y, w, slice);
+      const tw = 0.5 + 0.5 * Math.sin(t * 2.2 + i * 1.7 + h1 * 6.28);
+      ctx.globalAlpha = 0.10 * Math.pow(f, 1.6) * tw;
+      ctx.fillRect(game.moonX + dx - w * 0.5, y, w, slice - 1);
     }
     ctx.globalAlpha = 1;
   }
@@ -481,6 +507,7 @@ window.LQ = window.LQ || {};
 
   // ---------- Desbloqueios ----------
   function checkUnlocks(){
+    if (!game.unlocksEnabled) return;
     const s = game.state;
     for (const u of UNLOCKS){
       if (s.unlocked.indexOf(u.id) >= 0 || pending.indexOf(u.id) >= 0) continue;
@@ -584,7 +611,7 @@ window.LQ = window.LQ || {};
 
   // ---------- UI ----------
   const UI = {
-    hideTimer: 0, collOpen: false, hover: false,
+    hideTimer: 0, collOpen: false, hover: false, pinned: false, // pinned: painel aberto (loja) segura a barra
     init(){
       const ui = document.getElementById('ui');
       ui.addEventListener('pointerdown', e => e.stopPropagation());
@@ -615,17 +642,21 @@ window.LQ = window.LQ || {};
       }
       else if (a === 'coll'){ UI.collOpen = !UI.collOpen; document.getElementById('collection').classList.toggle('open', UI.collOpen); }
       else if (a === 'eco'){ s.eco = !s.eco; resize(); }
+      else if (a === 'mode'){ LQ.switchMode(game.mode === 'idle' ? 'zen' : 'idle'); return; }
+      else if (a === 'shop'){ game.emit('shopToggle', null); } // idle/hud.js implementa onShopToggle
       UI.applyClasses(); save();
     },
     applyClasses(){
       const b = document.body, s = game.state;
       b.classList.toggle('muted', !!s.muted);
       b.classList.toggle('eco', !!s.eco);
+      b.classList.toggle('mode-zen', game.mode === 'zen');
+      b.classList.toggle('mode-idle', game.mode === 'idle');
     },
     wake(){ UI.hideTimer = 0; document.body.classList.remove('uihidden'); },
     update(dt){
       game.mouse.idleFor += dt;
-      if (UI.hover) UI.hideTimer = 0; else UI.hideTimer += dt;
+      if (UI.hover || UI.pinned) UI.hideTimer = 0; else UI.hideTimer += dt;
       if (UI.hideTimer > 3) document.body.classList.add('uihidden');
       document.body.classList.toggle('nocursor', game.mouse.idleFor > 120);
     },
@@ -655,10 +686,18 @@ window.LQ = window.LQ || {};
     try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
     location.reload();
   };
+  // Troca de modo: salva o atual, grava a escolha e recarrega (cada modo tem seu save)
+  LQ.switchMode = function(m){
+    if (m !== 'zen' && m !== 'idle') return;
+    if (game.state) save();
+    writeMode(m);
+    resetting = true; // o save de unload não regrava por cima
+    location.reload();
+  };
 
   // ---------- Desenho por camadas ----------
   // 'reeds' vem depois de 'water' (juncos ficam na margem, em primeiro plano)
-  const LAYERS = ['sky', 'aurora', 'moon', 'mountains', 'water', 'reeds', 'lilies', 'fish', 'ripples', 'light', 'fog'];
+  const LAYERS = ['sky', 'aurora', 'moon', 'mountains', 'water', 'reeds', 'lilies', 'fish', 'ripples', 'light', 'fog', 'hud'];
   function draw(){
     if (paletteDirty) rebuildOffscreens();
     const W = game.W, H = game.H, hy = game.horizonY;
@@ -711,23 +750,65 @@ window.LQ = window.LQ || {};
       running = false; hiddenAt = Date.now(); save();
     } else {
       // Volta: avança relógio (cap 8 h) e deixa a cascata mostrar o que acordou
-      if (hiddenAt){ game.state.totalTime += Math.min((Date.now() - hiddenAt) / 1000, OFFLINE_CAP); hiddenAt = 0; }
+      let away = 0;
+      if (hiddenAt){ away = (Date.now() - hiddenAt) / 1000; game.state.totalTime += Math.min(away, OFFLINE_CAP); hiddenAt = 0; }
       checkUnlocks();
+      if (away > 0) call('onOffline', away, game);
       if (running) return; // já há um encadeamento de rAF
       running = true; last = performance.now(); requestAnimationFrame(frame);
     }
   }
 
+  // ---------- Escolha de modo (primeira abertura) ----------
+  const ICON_MOON = '<svg viewBox="0 0 24 24"><path d="M15 3.5a9 9 0 1 0 5.5 14.5A8 8 0 0 1 15 3.5z"/></svg>';
+  const ICON_BOLT = '<svg viewBox="0 0 24 24"><path d="M13 2.5L5 13.5h6l-1 8 9-11.5h-6l1-7.5z"/></svg>';
+  function showModePick(){
+    const d = document.createElement('div');
+    d.id = 'modepick';
+    d.style.cssText = 'position:fixed;inset:0;z-index:20;background:#050914;display:flex;align-items:center;justify-content:center;gap:12vw;opacity:0;transition:opacity .6s ease';
+    const mk = (m, svg) => {
+      const b = document.createElement('button');
+      b.dataset.mode = m;
+      b.style.cssText = 'width:min(28vw,180px);height:min(28vw,180px);border:0;background:transparent;padding:0;cursor:pointer;opacity:.6;transition:opacity .3s ease';
+      b.innerHTML = svg;
+      const sv = b.firstChild;
+      sv.style.cssText = 'width:100%;height:100%;fill:none;stroke:#e9f2ff;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round';
+      b.addEventListener('pointerenter', () => { b.style.opacity = '1'; });
+      b.addEventListener('pointerleave', () => { b.style.opacity = '.6'; });
+      b.addEventListener('click', () => {
+        writeMode(m);
+        d.style.opacity = '0';
+        setTimeout(() => { d.remove(); }, 600);
+        LQ.start(m);
+      });
+      return b;
+    };
+    d.appendChild(mk('zen', ICON_MOON));
+    d.appendChild(mk('idle', ICON_BOLT));
+    document.body.appendChild(d);
+    requestAnimationFrame(() => { d.style.opacity = '1'; });
+  }
+  // Ponto de entrada: com modo gravado inicia direto; sem modo mostra a escolha
+  LQ.boot = function(){
+    const m = readMode();
+    if (m) LQ.start(m); else showModePick();
+  };
+
   // ---------- Início ----------
-  LQ.start = function(){
+  LQ.start = function(mode){
+    game.mode = mode === 'idle' ? 'idle' : 'zen';
+    SAVE_KEY = SAVE_KEYS[game.mode];
+    game.unlocksEnabled = game.mode !== 'idle';
     game.state = load();
     game.platform = LQ.Platform || null;
     game.audio = LQ.Audio || audioStub;
     // Ganho offline (cap 8 h) + achievement de retorno após 24 h+
+    // (ausência calculada AQUI, antes de lastSeen ser consumida pelo save)
     const s = game.state, now = Date.now();
+    let away = 0;
     if (s.lastSeen > 0){
-      const away = (now - s.lastSeen) / 1000;
-      s.totalTime += Math.min(Math.max(0, away), OFFLINE_CAP);
+      away = Math.max(0, (now - s.lastSeen) / 1000);
+      s.totalTime += Math.min(away, OFFLINE_CAP);
       if (away >= 86400) game.achievement('left_light_on');
     }
     canvas = document.getElementById('lake');
@@ -737,6 +818,7 @@ window.LQ = window.LQ || {};
     game.palette = targetPalette(); paletteDirty = true;
 
     call('init', game);
+    if (away > 0) call('onOffline', away, game); // depois do init: entidades já têm estado
     started = true;
     UI.init();
     checkUnlocks(); // pendentes entram em cascata (2,5 s cada)
