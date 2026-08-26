@@ -4,7 +4,7 @@
 > Status atual sempre na seção **Agora**.
 
 ## Agora
-- **JOGO NO AR:** **https://allbele.github.io/lago-quieto/** · espelho Artifact: https://claude.ai/code/artifact/1211e100-54e0-4a88-8caf-2f0dd2c8e307
+- **JOGO NO AR:** **https://allbele.github.io/lago-quieto/** · espelho Artifact: https://claude.ai/code/artifact/f28cb4e2-ddfe-4ceb-8b77-f69738e5a7af
 - **Fase atual:** 6 concluída ✅ — **Modo ⚡ Idle publicado** junto com o 🌙 Zen em https://allbele.github.io/lago-quieto/ (tela de escolha na abertura). Steam segue aguardando a conta do usuário.
 - **Jogo:** **Lago Quieto** (*Quiet Lake*) — "Jogue uma pedra. O lago faz o resto." · slug `lago-quieto`
 - **Você precisa fazer:** nada.
