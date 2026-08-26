@@ -1,9 +1,12 @@
 // Lago Quieto — lírios d'água: discos derivando, balançam com anéis, florescem ao clique.
+// Zen: 3-5 lírios. Idle: 12 posicionados, visíveis os primeiros LQ.Idle.visible('lirio') (fade 1 s cada).
 (function(){
   'use strict';
   const TWO_PI = Math.PI * 2;
   const BLOOM_T = 3;   // flor abre em 3 s
+  const IDLE_MAX = 12;
   const lilies = [];
+  let lastCount = -1;
   // Área dos controles (coleção + barra de ícones, centro inferior): lírios não entram
   // (bot = H-100 mantém o centro acima da coleção; a zona central até H-150 cobre raio+balanço)
   const UI_H = 100, ZONE_H = 150, UI_HALF_W = 230;
@@ -19,9 +22,36 @@
     return x < game.W / 2 ? left : right;
   }
 
+  // idle: população vem de LQ.Idle.visible(id) (ou de pop em data.js); zen (ou -1): regra atual
+  function vis(game, id, zenValue){
+    if (game.mode !== 'idle' || !LQ.Idle) return zenValue;
+    if (typeof LQ.Idle.visible === 'function'){ const v = LQ.Idle.visible(id); if (v >= 0) return v; }
+    const P = LQ.IdleData && LQ.IdleData.pop && LQ.IdleData.pop[id];
+    if (!P || typeof LQ.Idle.genCount !== 'function') return zenValue;
+    const n = LQ.Idle.genCount(id);
+    return n <= 0 ? 0 : Math.min(P.cap, P.base + Math.floor(Math.log2(n)) * P.k);
+  }
+  // quantos lírios estão ativos (zen: todos)
+  function count(game){ return Math.min(lilies.length, vis(game, 'lirio', lilies.length)); }
+  // sincroniza 'shown' e game.lilyCount quando a população muda
+  function sync(game){
+    const n = count(game);
+    if (n === lastCount) return n;
+    for (let i = 0; i < lilies.length; i++){
+      const L = lilies[i];
+      if (i < n){ if (L.shown < 0) L.shown = game.t; } else L.shown = -1;
+    }
+    lastCount = n; game.lilyCount = n;
+    return n;
+  }
+  function fadeOf(L, game, base){
+    if (game.mode !== 'idle') return base;
+    return L.shown < 0 ? 0 : base * game.ease.smoothstep((game.t - L.shown) / 1);
+  }
+
   function place(game){
     lilies.length = 0;
-    const n = 3 + Math.floor(game.rand() * 3); // 3-5
+    const n = game.mode === 'idle' ? IDLE_MAX : 3 + Math.floor(game.rand() * 3); // zen: 3-5
     const top = game.horizonY + game.H * 0.12, bot = game.H - UI_H;
     for (let i = 0; i < n; i++){
       const y = top + (i + game.rand()) / n * (bot - top);
@@ -32,10 +62,15 @@
         rot: game.rand() * TWO_PI, notch: game.rand() * TWO_PI,
         vx: (game.rand() - 0.5) * 3, ph: game.rand() * TWO_PI,
         bob: 0, bobV: 0,            // oscilação vertical por anéis (mola amortecida)
-        bloomed: false, bloom: 0
+        bloomed: false, bloom: 0,
+        shown: -1                   // game.t em que apareceu (idle)
       });
     }
-    game.lilyCount = n;
+    lastCount = -1;
+    // já presentes ao iniciar: sem fade próprio
+    const c = count(game);
+    for (let i = 0; i < c; i++) lilies[i].shown = -1e9;
+    sync(game);
   }
 
   LQ.register('lilies', {
@@ -51,7 +86,9 @@
     },
     update(dt, game){
       if (!game.has('lilies')) return;
-      for (const L of lilies){
+      const n = sync(game);
+      for (let i = 0; i < n; i++){
+        const L = lilies[i];
         // deriva lenta, ida e volta
         L.x += L.vx * dt;
         if (L.x < 30){ L.x = 30; L.vx = Math.abs(L.vx); }
@@ -74,14 +111,19 @@
     },
     onRipple(x, y, game){
       if (!game.has('lilies')) return;
-      for (const L of lilies){
+      const n = count(game);
+      for (let i = 0; i < n; i++){
+        const L = lilies[i];
         const d = Math.hypot(L.x - x, (L.y - y) / 0.35);
         if (d < 220) L.bobV += 40 * (1 - d / 220);
       }
     },
     onClick(x, y, game){
       if (!game.has('lilies') || game.unlockFade('lilies') < 0.5) return false;
-      for (const L of lilies){
+      const n = count(game);
+      for (let i = 0; i < n; i++){
+        const L = lilies[i];
+        if (fadeOf(L, game, 1) < 0.5) continue;
         const dx = x - L.x, dy = (y - L.y - L.bob) / 0.45;
         if (dx * dx + dy * dy < (L.r + 4) * (L.r + 4)){
           L.bobV += 25;
@@ -90,7 +132,7 @@
             game.state.liliesBloomed++;
             game.audio.play('bloom', { x: x / game.W, y: 0.4, gain: 1 });
             game.ui.refreshCollection('flower');
-            if (lilies.every(l => l.bloomed)) game.achievement('night_bloom');
+            if (lilies.slice(0, n).every(l => l.bloomed)) game.achievement('night_bloom');
           } else {
             game.audio.play('pulse', { x: x / game.W, y: 0.4, gain: 1 });
           }
@@ -104,11 +146,15 @@
     },
     draw(layer, ctx, game){
       if (!game.has('lilies')) return;
-      const fade = game.unlockFade('lilies');
-      if (fade <= 0.01) return;
+      const base = game.unlockFade('lilies');
+      if (base <= 0.01) return;
+      const n = count(game);
       if (layer === 'lilies'){
         ctx.fillStyle = game.palette.dark;
-        for (const L of lilies){
+        for (let i = 0; i < n; i++){
+          const L = lilies[i];
+          const fade = fadeOf(L, game, base);
+          if (fade <= 0.01) continue;
           const y = L.y + L.bob, sway = Math.max(0.7, Math.min(1.3, 1 + L.bob * 0.01));
           ctx.globalAlpha = 0.9 * fade;
           // disco elíptico com um recorte (folha de lírio)
@@ -132,15 +178,18 @@
         ctx.globalAlpha = 1;
       } else if (layer === 'light'){
         // flores brancas abrindo (pétalas = elipses radiais), centro dourado
-        for (const L of lilies){
+        for (let i = 0; i < n; i++){
+          const L = lilies[i];
           if (L.bloom <= 0) continue;
+          const fade = fadeOf(L, game, base);
+          if (fade <= 0.01) continue;
           const k = game.ease.smoothstep(L.bloom / BLOOM_T);
           const y = L.y + L.bob - L.r * 0.25;
           const pr = L.r * 0.55 * k;
           ctx.fillStyle = game.palette.light;
           const petals = 8;
-          for (let i = 0; i < petals; i++){
-            const a = L.rot + i / petals * TWO_PI;
+          for (let p = 0; p < petals; p++){
+            const a = L.rot + p / petals * TWO_PI;
             const px = L.x + Math.cos(a) * pr * 0.55, py = y + Math.sin(a) * pr * 0.25;
             ctx.globalAlpha = 0.28 * fade * k;
             ctx.beginPath(); ctx.ellipse(px, py, pr * 0.6, pr * 0.22, a, 0, TWO_PI); ctx.fill();
@@ -157,4 +206,7 @@
       }
     }
   });
+
+  // leitura (depuração/testes): quantos lírios estão ativos agora
+  LQ.lilies = { count: () => (LQ.game ? count(LQ.game) : 0) };
 })();

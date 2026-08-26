@@ -153,6 +153,7 @@ window.LQ = window.LQ || {};
     lightBlend: 'lighter',      // ent/themes.js troca para 'multiply' em tema claro
     rand, ease, hash,
     mode: 'zen',                // 'zen' | 'idle' (LQ.start define)
+    stoneStyle: 'stone',        // 'stone' | 'racao' (idle: engine troca ao comprar ração)
     unlocksEnabled: true,       // idle: false → checkUnlocks não roda por tempo/anéis
     setPaletteOverride(obj){ paletteOverride = obj || null; },
     // Evento genérico → hook 'on'+Nome nas entidades (ex.: emit('impact',p) → onImpact(p, game))
@@ -320,7 +321,7 @@ window.LQ = window.LQ || {};
     r.strength = opts.strength !== undefined ? opts.strength : 1;
     r.rings = clamp(Math.round(opts.rings !== undefined ? opts.rings : (r.strength < 0.5 ? 1 : r.strength < 0.8 ? 2 : 3)) || 1, 1, 3);
     activeRipples++;
-    call('onRipple', x, y, game);
+    if (!opts.silent) call('onRipple', x, y, game); // silent: anel de bônus não acorda os moradores
     return r;
   }
   const RING_DELAY = [0, 0.12, 0.24], RING_A0 = [1, 0.6, 0.35];
@@ -414,7 +415,7 @@ window.LQ = window.LQ || {};
     spawnDrops(x, y, 3 + Math.floor(rand() * 4));
     s.ripples++;
     game.calm = Math.min(20, game.calm + 1);
-    game.emit('impact', { x, y, strength: 1, source: 'stone' });
+    game.emit('impact', { x, y, strength: 1, source: 'stone', t: performance.now() / 1000 }); // t: relógio real (combo)
     // Áudio: plop + nota (x → nota, y → oitava); nota só se >80 ms desde a anterior
     const nx = clamp(x / game.W, 0, 1), ny = clamp((y - game.horizonY) / (game.H - game.horizonY), 0, 1);
     // gain é relativo (1 = valor de projeto do §6; audio.js aplica os absolutos)
@@ -453,7 +454,13 @@ window.LQ = window.LQ || {};
       const h = st.dew ? st.fallH : 40;
       const y = st.y - h * (1 - k), x = st.x - (st.dew ? 0 : 8) * (1 - k);
       ctx.globalAlpha = st.dew ? 0.6 : 0.9;
-      ctx.beginPath(); ctx.arc(x, y, st.dew ? 1.5 : 2, 0, Math.PI * 2); ctx.fill();
+      if (!st.dew && game.stoneStyle === 'racao'){
+        // ração: 3 pontinhos que se abrem ao cair
+        const o = (1 - k) * 0.5 + 0.5;
+        ctx.beginPath(); ctx.arc(x - 3 * o, y + 1 * o, 1, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x + 1 * o, y - 2 * o, 1, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x + 3 * o, y + 2 * o, 1, 0, Math.PI * 2); ctx.fill();
+      } else { ctx.beginPath(); ctx.arc(x, y, st.dew ? 1.5 : 2, 0, Math.PI * 2); ctx.fill(); }
     }
     ctx.globalAlpha = 1;
   }

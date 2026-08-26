@@ -1,17 +1,31 @@
-// Vagalumes — 5 com 'fireflies', 15 com 'fireflies2'. Movimento = soma de 2 senos, pulso 2-4 s.
-// Glow via game.sprite.glow na camada 'light'. Fogem 30 px do anel (ease 600 ms) e brilham 2 s
-// com tilintar; clique = pulso + nota uma oitava acima. Alguns pousam nas pontas dos juncos e,
-// com 3+ pousados próximos, linhas finas de constelação (alpha 0.15) ligam-os por alguns segundos.
+// Vagalumes — zen: 5 com 'fireflies', 15 com 'fireflies2'; idle: população por LQ.Idle.visible('vagalume') (até 30).
+// Movimento = soma de 2 senos, pulso 2-4 s. Glow via game.sprite.glow na camada 'light'. Fogem 30 px do
+// anel (ease 600 ms) e brilham 2 s com tilintar; clique = pulso + nota uma oitava acima. Alguns pousam nas
+// pontas dos juncos e, com 3+ pousados próximos, linhas finas de constelação (alpha 0.15) ligam-os.
 window.LQ = window.LQ || {};
 (function(){
   'use strict';
   const LQ = window.LQ;
-  const MAX = 15, BASE = 5;
+  const MAX = 30, BASE = 5, ZEN_MAX = 15;
   const FLEE_R = 150, FLEE_D = 30, FLEE_T = 0.6, SHINE_T = 2.0;
   const HIT_R = 16, CONST_R = 110;
   const flies = [];
-  let lastChime = -1e9, constAlpha = 0, constTimer = 0;
+  let lastChime = -1e9, constAlpha = 0, constTimer = 0, lastN = 0;
   const pairs = [];   // pares ligados por linhas de constelação
+
+  // idle: população vem de LQ.Idle.visible(id) (ou de pop em data.js); zen (ou -1): regra atual
+  function vis(game, id, zenValue){
+    if (game.mode !== 'idle' || !LQ.Idle) return zenValue;
+    if (typeof LQ.Idle.visible === 'function'){ const v = LQ.Idle.visible(id); if (v >= 0) return v; }
+    const P = LQ.IdleData && LQ.IdleData.pop && LQ.IdleData.pop[id];
+    if (!P || typeof LQ.Idle.genCount !== 'function') return zenValue;
+    const n = LQ.Idle.genCount(id);
+    return n <= 0 ? 0 : Math.min(P.cap, P.base + Math.floor(Math.log2(n)) * P.k);
+  }
+  // idle: quantidade comprada do gerador (marcos); zen: 0
+  function gc(game, id){
+    return game.mode === 'idle' && LQ.Idle && typeof LQ.Idle.genCount === 'function' ? LQ.Idle.genCount(id) : 0;
+  }
 
   function mk(rnd){
     return {
@@ -30,8 +44,8 @@ window.LQ = window.LQ || {};
   }
 
   function alive(game){
-    if (!game.has('fireflies')) return 0;
-    return game.has('fireflies2') ? MAX : BASE;
+    const zen = !game.has('fireflies') ? 0 : game.has('fireflies2') ? ZEN_MAX : BASE;
+    return Math.min(MAX, vis(game, 'vagalume', zen));
   }
 
   function freePos(f, game){
@@ -53,19 +67,29 @@ window.LQ = window.LQ || {};
       flies.length = 0;
       for (let i = 0; i < MAX; i++) flies.push(mk(game.rand));
       // já acordados em sessão anterior: nascem em t=0 (born<0 significa 'ainda não')
-      if (game.has('fireflies')) for (let i = 0; i < alive(game); i++) flies[i].born = 0;
+      lastN = alive(game);
+      if (game.has('fireflies') || game.mode === 'idle') for (let i = 0; i < lastN; i++) flies[i].born = 0;
     },
 
     onUnlock(id, game){
       const n = alive(game);
       // cada um tilinta ao acordar (em update, quando cruza `born`) — coro esparso
       for (let i = 0; i < n; i++) if (flies[i].born < 0){ flies[i].born = game.t + (i % BASE) * 0.7; flies[i].woke = false; }
+      lastN = n;
     },
 
     update(dt, game){
       const n = alive(game), rnd = game.rand, t = game.t;
+      // população mudou (compra/prestígio): novos nascem escalonados; os que saem voltam a 'ainda não'
+      if (n !== lastN){
+        for (let i = lastN; i < n; i++) if (flies[i].born < 0){ flies[i].born = t + (i - lastN) * 0.7; flies[i].woke = false; }
+        for (let i = n; i < lastN; i++){ flies[i].born = -1; flies[i].state = 0; flies[i].perch = null; }
+        lastN = n;
+      }
       const perches = (LQ.reeds && LQ.reeds.perches) ? LQ.reeds.perches(game) : [];
       const W = game.W, H = game.H;
+      // pousar nos juncos: fase 6 (fireflies2, §3) ou, no idle, marco de 5 vagalumes comprados
+      const canPerch = game.has('fireflies2') || gc(game, 'vagalume') >= 5;
       for (let i = 0; i < MAX; i++){
         const f = flies[i];
         if (i >= n || f.born < 0 || t < f.born) continue;
@@ -76,8 +100,7 @@ window.LQ = window.LQ || {};
 
         if (f.state === 0){
           f.wait -= dt;
-          // pousar nos juncos é comportamento da fase 6 (fireflies2, §3)
-          if (f.wait <= 0 && perches.length && game.has('fireflies2') && rnd() < 0.5){
+          if (f.wait <= 0 && perches.length && canPerch && rnd() < 0.5){
             f.perch = perches[Math.floor(rnd() * perches.length)].reed;
             f.state = 1; f.st = 0; f.sx = f.x; f.sy = f.y;
           } else if (f.wait <= 0) f.wait = 10 + rnd() * 20;
@@ -111,10 +134,11 @@ window.LQ = window.LQ || {};
         }
       }
 
-      // Constelação: 3+ pousados a <110 px entre si
+      // Constelação: 3+ pousados a <110 px entre si (zen: fireflies2; idle: marco de 10 vagalumes)
       pairs.length = 0;
       const perched = [];
-      for (let i = 0; i < n; i++) if (flies[i].state === 2 && flies[i].born >= 0) perched.push(flies[i]);
+      const canConst = game.has('fireflies2') || gc(game, 'vagalume') >= 10;
+      if (canConst) for (let i = 0; i < n; i++) if (flies[i].state === 2 && flies[i].born >= 0) perched.push(flies[i]);
       let cluster = false;
       if (perched.length >= 3){
         for (let a = 0; a < perched.length; a++){
@@ -145,11 +169,13 @@ window.LQ = window.LQ || {};
       const R = game.eco ? 10 : 14;
       const glow = game.sprite.glow(P.firefly, R);
       const eff = game.unlockFade('fireflies');
+      // além dos 5 base: fade de 'fireflies2' (zen); no idle não existe → fade dos vagalumes
+      const f2 = game.has('fireflies2') ? game.unlockFade('fireflies2') : eff;
 
       // Linhas de constelação entre pousados
       if (constAlpha > 0.01 && pairs.length){
         ctx.strokeStyle = P.firefly; ctx.lineWidth = 1;
-        ctx.globalAlpha = 0.15 * constAlpha * dayFade * game.unlockFade('fireflies2');
+        ctx.globalAlpha = 0.15 * constAlpha * dayFade * f2;
         ctx.beginPath();
         for (let i = 0; i < pairs.length; i += 2){ ctx.moveTo(pairs[i].x, pairs[i].y); ctx.lineTo(pairs[i + 1].x, pairs[i + 1].y); }
         ctx.stroke();
@@ -160,7 +186,7 @@ window.LQ = window.LQ || {};
         const f = flies[i];
         if (f.born < 0 || t < f.born) continue;
         const bornK = game.ease.smoothstep((t - f.born) / 5);
-        const fade = (i < BASE ? eff : game.unlockFade('fireflies2')) * bornK * dayFade;
+        const fade = (i < BASE ? eff : f2) * bornK * dayFade;
         if (fade <= 0.01) continue;
         // Pulso lento (2-4 s) — respiração de luz
         let b = 0.5 + 0.5 * Math.sin(t * Math.PI * 2 / f.period + f.pph);
@@ -216,5 +242,6 @@ window.LQ = window.LQ || {};
   };
 
   LQ.register('fireflies', def);
-  LQ.fireflies = { list: flies }; // leitura (depuração/outras entidades)
+  // leitura (depuração/testes/outras entidades): lista do pool e quantos estão vivos agora
+  LQ.fireflies = { list: flies, alive: () => (LQ.game ? alive(LQ.game) : 0) };
 })();

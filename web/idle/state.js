@@ -13,7 +13,7 @@ LQ.IdleState = (function(){
       v: 1, cur: 0, life: 0, gens: {}, ups: [],
       prest: { pts: 0, runs: 0, mult: 1 },
       goals: [], lastTick: 0,
-      stats: { clicks: 0, offlineEarned: 0, bestRate: 0, purchases: 0 }
+      stats: { clicks: 0, offlineEarned: 0, bestRate: 0, purchases: 0, bonuses: {}, bonusSeen: {} }
     };
   }
 
@@ -36,6 +36,14 @@ LQ.IdleState = (function(){
     const st = s.stats && typeof s.stats === 'object' ? s.stats : {};
     out.stats.clicks = int(st.clicks); out.stats.offlineEarned = pos(st.offlineEarned);
     out.stats.bestRate = pos(st.bestRate); out.stats.purchases = int(st.purchases);
+    // contagem de bônus por tipo (fish/glint/combo/shooting…), chaves saneadas, valores inteiros
+    out.stats.bonuses = {};
+    if (st.bonuses && typeof st.bonuses === 'object' && !Array.isArray(st.bonuses))
+      for (const k in st.bonuses) if (idOk(k)) out.stats.bonuses[k] = int(st.bonuses[k]);
+    // toasts de 1ª vez já vistos (hud grava {chave:true})
+    out.stats.bonusSeen = {};
+    if (st.bonusSeen && typeof st.bonusSeen === 'object' && !Array.isArray(st.bonusSeen))
+      for (const k in st.bonusSeen) if (idOk(k) && st.bonusSeen[k]) out.stats.bonusSeen[k] = true;
     out.v = 1;
     return out;
   }

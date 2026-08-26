@@ -77,12 +77,12 @@ window.LQ = window.LQ || {};
     }
     s.lastTick = Date.now();
     if (s.stats && typeof s.stats === 'object') s.stats.bestRate = 0;
-    // A cena só é limpa após os sinos (LQ.resetScene), mas o save precisa já refletir gens={} sem moradores
-    // acordados — senão fechar a aba durante os sinos deixaria unlocked cheio sem geradores.
-    if (game.state){ game.state.unlocked = []; if (game.state.dawnAt !== undefined) game.state.dawnAt = -1; }
+    // A cena viva fica intacta durante os sinos (LQ.resetScene limpa unlocked depois); só a cópia gravada
+    // já vai com unlocked=[] — fechar a aba durante os sinos não deixa moradores acordados sem geradores.
     rotateTheme(s.prest.runs);
     applySkin(s.prest.runs);
-    if (LQ.Idle && typeof LQ.Idle.save === 'function') LQ.Idle.save();
+    const patch = { unlocked: [] }; if (game.state && game.state.dawnAt !== undefined) patch.dawnAt = -1;
+    if (LQ.Idle && typeof LQ.Idle.save === 'function') LQ.Idle.save(patch);
   }
 
   function request(){

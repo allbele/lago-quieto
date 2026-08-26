@@ -1,4 +1,4 @@
-// Céu: estrelas, lua, nuvem, estrela cadente, aurora, montanhas, pássaros do amanhecer.
+// Céu: estrelas, lua, nuvem, estrela cadente (+ reflexo clicável no idle), aurora, montanhas, pássaros.
 (function(){
   'use strict';
   const LQ = window.LQ;
@@ -11,9 +11,27 @@
     const A = hexToRgb(a), B = hexToRgb(b);
     return '#' + [0, 1, 2].map(i => Math.max(0, Math.min(255, Math.round(A[i] + (B[i] - A[i]) * t))).toString(16).padStart(2, '0')).join('');
   }
+  const hexA = a => Math.round(Math.max(0, Math.min(1, a)) * 255).toString(16).padStart(2, '0');
+
+  // ---------- idle: leitura segura do motor (zen → -1 / regra atual) ----------
+  const inIdle = game => game.mode === 'idle' && !!LQ.Idle;
+  const POP = () => (LQ.IdleData && LQ.IdleData.pop) || {};
+  const BON = () => (LQ.IdleData && LQ.IdleData.bonus) || {};
+  const genN = id => (LQ.Idle && typeof LQ.Idle.genCount === 'function') ? LQ.Idle.genCount(id) : 0;
+  // vis(count, base, k, cap) do plano — fallback caso o engine ainda não exponha visible()
+  function visLocal(count, p){ return (!p || count <= 0) ? 0 : Math.min(p.cap, p.base + Math.floor(Math.log2(count)) * p.k); }
+  function vis(game, id, genId){
+    if (!inIdle(game)) return -1;
+    if (typeof LQ.Idle.visible === 'function'){ const v = LQ.Idle.visible(id); if (typeof v === 'number') return v; }
+    return visLocal(genN(genId || id), POP()[id]);
+  }
+  // céu vivo: zen = unlock; idle = unlock ou 1ª estrela comprada (sky_alive nunca desbloqueia em idle)
+  const skyAlive = game => game.has('sky_alive') || (inIdle(game) && genN('estrelas') >= 1);
+  const skyAliveFade = game => game.has('sky_alive') ? game.unlockFade('sky_alive') : (skyAlive(game) ? 1 : 0);
+  const cloudOn = game => game.has('sky_alive') || (inIdle(game) && genN('lua') >= 10);
 
   // ---------- estrelas ----------
-  const STAR_TOTAL = 60, DYN = 12;
+  const STAR_TOTAL = 200, DYN = 12;
   const stars = [];        // {nx, ny, size, phase, speed}
   let starCv = null, starCvN = -1, starCvW = 0, starCvH = 0, starCvVer = -1;
   let visibleN = 15;
@@ -28,9 +46,12 @@
   // ---------- estrela cadente ----------
   let shootTimer = 0;
   const shoot = { active: false, x: 0, y: 0, vx: 0, vy: 0, age: 0 };
+  // reflexo clicável na água (só idle): life em s, 0 = inativo
+  const reflect = { x: 0, y: 0, life: 0, max: 2 };
+  let prestSub = false;    // já assinou LQ.Idle.on('prestige')?
 
   // ---------- aurora ----------
-  let auroraCv = null, auroraCtx = null, auroraAt = -1, auroraK = -1;
+  let auroraCv = null, auroraCtx = null, auroraAt = -1, auroraK = -1, auroraBands = 1;
   const AURORA_HZ = 15;    // repinta o offscreen a 15 Hz (o blur do upscale esconde o passo)
   let noiseCv = null;      // sprite 256x256 de ruído azul-frio (quebra o banding das faixas escaladas)
   const NOISE_T = 256;
@@ -39,8 +60,8 @@
   })();
 
   // ---------- montanhas ----------
-  let mBack = null, mFront = null;
-  let mColVer = -1, mColBack = '#000', mColFront = '#000';
+  const ridges = [];       // do fundo para a frente: {path, par, col}
+  let mN = -1, mColVer = -1;
 
   // ---------- pássaros ----------
   const birds = [];        // {x, y, vx, phase}
@@ -55,6 +76,8 @@
     }
   }
   function starCount(game){
+    const v = vis(game, 'estrelas');
+    if (v > 0) return Math.min(STAR_TOTAL, v); // idle com estrelas compradas
     return Math.round(15 + 20 * game.unlockFade('stars2') + 25 * game.unlockFade('sky_alive'));
   }
   // Bakea as estrelas assentadas (todas menos as DYN dinâmicas) num offscreen
@@ -73,19 +96,35 @@
     starCvN = n; starCvW = W; starCvH = hy; starCvVer = game.paletteVersion;
   }
 
+  // escala/halo da lua pelo gerador 'lua' (zen: 1 / gradiente atual)
+  function moonPop(game){
+    if (!inIdle(game)) return { scale: 1, halo: -1, gold: false };
+    const p = POP().lua || { scaleStep: 0.08, scaleCap: 1.6, haloMin: 0.55, haloMax: 0.9 };
+    const n = genN('lua');
+    // mesma fórmula do engine (LQ.Idle.moon); fallback local idêntico: step = floor(log2 n)+1
+    const m = typeof LQ.Idle.moon === 'function' ? LQ.Idle.moon() : null;
+    if (m) return { scale: m.scale, halo: m.halo, gold: n >= 25 };
+    const step = n <= 0 ? 0 : Math.floor(Math.log2(n)) + 1;
+    const scale = Math.min(p.scaleCap, 1 + p.scaleStep * step);
+    const t = p.scaleCap > 1 ? (scale - 1) / (p.scaleCap - 1) : 0;
+    return { scale, halo: p.haloMin + (p.haloMax - p.haloMin) * t, gold: n >= 25 };
+  }
   function buildMoon(game){
-    const R = Math.max(8, Math.round(Math.min(game.W, game.H) * 0.035));
-    const key = R + '|' + game.palette.light;
+    const mp = moonPop(game);
+    const R = Math.max(8, Math.round(Math.min(game.W, game.H) * 0.035 * mp.scale));
+    const key = R + '|' + game.palette.light + '|' + mp.halo.toFixed(2) + '|' + (mp.gold ? 'g' : '');
     if (key === moonKey && moonCv) return R;
     moonKey = key;
     const G = R * 3;
     if (!moonCv) moonCv = document.createElement('canvas'); // reutiliza o offscreen
     moonCv.width = moonCv.height = G * 2;
     const g = moonCv.getContext('2d');
+    const hc = mp.gold ? lerpHex(game.palette.light, game.palette.gold, 0.5) : game.palette.light; // marco 25: halo dourado
+    const a0 = mp.halo < 0 ? '55' : hexA(mp.halo * 0.6), a1 = mp.halo < 0 ? '18' : hexA(mp.halo * 0.17);
     const grad = g.createRadialGradient(G, G, R * 0.9, G, G, G);
-    grad.addColorStop(0, game.palette.light + '55');
-    grad.addColorStop(0.4, game.palette.light + '18');
-    grad.addColorStop(1, game.palette.light + '00');
+    grad.addColorStop(0, hc + a0);
+    grad.addColorStop(0.4, hc + a1);
+    grad.addColorStop(1, hc + '00');
     g.fillStyle = grad; g.fillRect(0, 0, G * 2, G * 2);
     g.fillStyle = game.palette.light;
     g.beginPath(); g.arc(G, G, R, 0, TAU); g.fill();
@@ -96,7 +135,9 @@
     return R;
   }
 
-  function buildMountains(game){
+  // n cordilheiras (zen 2). As 2 da frente saem idênticas ao zen; extras entram atrás, mais altas.
+  function mountainCount(game){ const v = vis(game, 'montanhas', 'nevoa'); return v > 0 ? Math.max(2, Math.min(4, v)) : 2; }
+  function buildMountains(game, n){
     const W = game.W, hy = game.horizonY;
     const r = mkRand(4242);
     function ridge(hMax, seg, yBase){
@@ -115,8 +156,23 @@
       p.closePath();
       return p;
     }
-    mBack = ridge(hy * 0.22, 9, hy * 0.02);
-    mFront = ridge(hy * 0.13, 14, 0);
+    ridges.length = 0;
+    const back = ridge(hy * 0.22, 9, hy * 0.02), front = ridge(hy * 0.13, 14, 0);
+    // extras (mais ao fundo primeiro): hMax crescente, parallax menor
+    const EXTRA = [{ h: 0.30, seg: 7, yb: 0.04, par: 0.35 }, { h: 0.38, seg: 6, yb: 0.06, par: 0.25 }];
+    for (let k = n - 3; k >= 0; k--){ const e = EXTRA[k]; ridges.push({ path: ridge(hy * e.h, e.seg, hy * e.yb), par: e.par, col: '#000', depth: 2 + k }); }
+    ridges.push({ path: back, par: 0.5, col: '#000', depth: 1 });
+    ridges.push({ path: front, par: 1, col: '#000', depth: 0 });
+    mN = n; mColVer = -1;
+  }
+  function tintMountains(P){
+    const cBack = lerpHex(P.horizon, P.zenith, 0.45);
+    const cFront = lerpHex(lerpHex(P.horizon, P.zenith, 0.85), P.dark, 0.25);
+    for (const m of ridges){
+      if (m.depth === 0) m.col = cFront;
+      else if (m.depth === 1) m.col = cBack;
+      else m.col = lerpHex(cBack, P.zenith, 0.3 + 0.25 * (m.depth - 2)); // mais longe → mais perto do zênite
+    }
   }
 
   function ensureAurora(game){
@@ -149,32 +205,38 @@
   // Redesenha o offscreen da aurora: 6 faixas com alpha senoidal; cada coluna é afunilada em
   // 5 rects (alpha 0.25/0.6/1/0.6/0.25) para não haver borda dura; ondas com fase/frequência
   // distintas por faixa, janela horizontal suave e faixas de baixo esmaecendo (sem 'degrau').
+  // bands=2 (marco 'duas faixas' do idle): segunda cortina deslocada, mais fina e fraca, por cima.
   const TAPER = [0.25, 0.6, 1, 0.6, 0.25];
   // qualidade do upscale da aurora: 'high' até ~1600 px de largura; acima disso 'low' (custo por área)
   const auroraQuality = game => game.W > 1600 ? 'low' : 'high';
+  function auroraBandCount(game){ const v = vis(game, 'aurora'); const at = (POP().aurora || {}).bands2At || 10; return (v >= 0 && genN('aurora') >= at) ? 2 : 1; }
   function paintAurora(game, k){
     ensureAurora(game);
+    const bands = auroraBandCount(game);
     // throttle: só repinta quando passou 1/AURORA_HZ s (ou k mudou bastante, p.ex. no fade de entrada)
-    if (auroraAt >= 0 && game.t - auroraAt < 1 / AURORA_HZ && Math.abs(k - auroraK) < 0.02) return;
-    auroraAt = game.t; auroraK = k;
+    if (auroraAt >= 0 && bands === auroraBands && game.t - auroraAt < 1 / AURORA_HZ && Math.abs(k - auroraK) < 0.02) return;
+    auroraAt = game.t; auroraK = k; auroraBands = bands;
     const g = auroraCtx, w = auroraCv.width, h = auroraCv.height, t = game.t;
     g.clearRect(0, 0, w, h);
     const cols = [game.palette.auroraG, game.palette.auroraP];
     const sx = (game.W / 4) / w; // frequências em 'px de offscreen 1/4' (spec), independentes da escala real
-    for (let b = 0; b < 6; b++){
-      g.fillStyle = cols[b % 2];
-      const yb = h * (0.08 + b * 0.13), bh = h * 0.14, step = bh * 0.45;
-      const fadeB = b >= 4 ? (b === 4 ? 0.7 : 0.4) : 1;
-      for (let x = 0; x < w; x += 2){
-        const X = x * sx;
-        const a = 0.5 + 0.5 * Math.sin(X * 0.025 + t * 0.3 + b * 0.7);
-        const y = yb + Math.sin(X * 0.05 * (0.6 + b * 0.15) + t * 0.2 + b * 1.9) * h * 0.12
-                     + Math.sin(X * 0.013 + t * 0.07 + b) * h * 0.05;
-        const win = Math.pow(Math.sin(Math.PI * (x + 1) / (w + 2)), 0.6); // janela horizontal
-        const base = (0.045 + 0.045 * a) * k * 0.55 * win * fadeB / 1.6; // /1.6: 5 rects somam mais que 3
-        for (let i = 0; i < 5; i++){
-          g.globalAlpha = base * TAPER[i];
-          g.fillRect(x, y + (i - 2) * step, 2, bh);
+    for (let c = 0; c < bands; c++){
+      const off = c * 0.37, ph = c * 2.1, gain = c ? 0.6 : 1;
+      for (let b = 0; b < 6; b++){
+        g.fillStyle = cols[(b + c) % 2];
+        const yb = h * (0.08 + b * 0.13 + off * 0.2), bh = h * (0.14 - c * 0.04), step = bh * 0.45;
+        const fadeB = b >= 4 ? (b === 4 ? 0.7 : 0.4) : 1;
+        for (let x = 0; x < w; x += 2){
+          const X = x * sx;
+          const a = 0.5 + 0.5 * Math.sin(X * 0.025 + t * 0.3 + b * 0.7 + ph);
+          const y = yb + Math.sin(X * 0.05 * (0.6 + b * 0.15) + t * 0.2 + b * 1.9 + ph) * h * 0.12
+                       + Math.sin(X * 0.013 + t * 0.07 + b + ph) * h * 0.05;
+          const win = Math.pow(Math.sin(Math.PI * (x + 1) / (w + 2)), 0.6); // janela horizontal
+          const base = (0.045 + 0.045 * a) * k * 0.55 * win * fadeB * gain / 1.6; // /1.6: 5 rects somam mais que 3
+          for (let i = 0; i < 5; i++){
+            g.globalAlpha = base * TAPER[i];
+            g.fillRect(x, y + (i - 2) * step, 2, bh);
+          }
         }
       }
     }
@@ -184,10 +246,13 @@
   LQ.register('sky', {
     init(game){
       buildStars(game);
-      buildMountains(game);
+      buildMountains(game, mountainCount(game));
       lastW = game.W; lastH = game.H;
       shootTimer = 120 + game.rand() * 120;
       cloudX = -game.W * 0.2;
+      reflect.life = 0;
+      // prestígio (LQ.Idle.emit('prestige')): sem reflexo pendente
+      if (inIdle(game) && !prestSub && typeof LQ.Idle.on === 'function'){ prestSub = true; LQ.Idle.on('prestige', () => { reflect.life = 0; }); }
       // lua já desbloqueada em sessão anterior: nasce imediatamente cheia
       if (game.has('moon')) moonRise = -MOON_RISE_T; // já cheia
       dawnDone = game.state.achievements.indexOf('until_dawn') >= 0;
@@ -198,34 +263,46 @@
       if (id === 'sky_alive') shootTimer = 30 + game.rand() * 60;
     },
 
-    onResize(game){ lastW = game.W; lastH = game.H; buildMountains(game); starCvN = -1; },
+    onResize(game){ lastW = game.W; lastH = game.H; buildMountains(game, mountainCount(game)); starCvN = -1; },
     update(dt, game){
-      if (game.W !== lastW || game.H !== lastH){ lastW = game.W; lastH = game.H; buildMountains(game); starCvN = -1; }
+      if (game.W !== lastW || game.H !== lastH){ lastW = game.W; lastH = game.H; buildMountains(game, mountainCount(game)); starCvN = -1; }
+      else { const n = mountainCount(game); if (n !== mN) buildMountains(game, n); }
       visibleN = starCount(game);
 
       // nuvem fina cruzando a lua
-      if (game.has('sky_alive')){
+      if (cloudOn(game)){
         cloudX += cloudSpeed * dt;
         if (cloudX > game.W * 1.3) cloudX = -game.W * 0.3;
       }
 
-      // estrela cadente
-      if (game.has('sky_alive') && game.dayPhase < 0.3){
+      // estrela cadente (idle: desde o início, raras; 'cadentes frequentes' com 10 estrelas)
+      if ((skyAlive(game) || inIdle(game)) && game.dayPhase < 0.3){
         if (!shoot.active){
           shootTimer -= dt;
           if (shootTimer <= 0){
-            shootTimer = 120 + game.rand() * 120;
+            const freq = inIdle(game) && genN('estrelas') >= 10 ? 0.5 : 1;
+            shootTimer = (120 + game.rand() * 120) * freq;
             shoot.active = true; shoot.age = 0;
             shoot.x = game.W * (0.1 + game.rand() * 0.8); shoot.y = game.horizonY * (0.05 + game.rand() * 0.4);
             const dir = game.rand() < 0.5 ? -1 : 1, sp = 500 + game.rand() * 300;
             shoot.vx = dir * sp; shoot.vy = sp * (0.25 + game.rand() * 0.25);
             game.audio.play('shooting', { x: shoot.x / game.W, gain: 1 });
+            // idle: reflexo clicável no ponto espelhado do meio do rastro (clampado à água)
+            if (inIdle(game)){
+              const hy = game.horizonY, mx = shoot.x + shoot.vx * 0.2, my = shoot.y + shoot.vy * 0.2;
+              // fora da loja aberta e acima da barra (mesma regra de LQ.Idle.lakePoint)
+              const sw = typeof LQ.Idle.shopWidth === 'function' ? LQ.Idle.shopWidth() : 0;
+              reflect.x = Math.max(20, Math.min(game.W - 20 - sw, mx));
+              reflect.y = Math.max(hy + 24, Math.min(game.H - 90, 2 * hy - my));
+              reflect.max = BON().shootLife || 2; reflect.life = reflect.max;
+            }
           }
         } else {
           shoot.age += dt; shoot.x += shoot.vx * dt; shoot.y += shoot.vy * dt;
           if (shoot.age > 0.4) shoot.active = false;
         }
       }
+      if (reflect.life > 0){ reflect.life -= dt; if (!inIdle(game)) reflect.life = 0; }
 
       // lua
       if (moonRise !== null){
@@ -255,6 +332,18 @@
         const b = birds[i]; b.x += b.vx * dt; b.phase += dt * 6;
         if (b.x < -80 || b.x > game.W + 80) birds.splice(i, 1);
       }
+    },
+
+    // reflexo da cadente (só idle): clique r<shootRadius → bônus ×shootMult e consome o clique
+    onClick(x, y, game){
+      if (reflect.life <= 0 || !inIdle(game)) return false;
+      if (Math.hypot(x - reflect.x, y - reflect.y) >= (BON().shootRadius || 40)) return false;
+      const mult = BON().shootMult || 25;
+      if (typeof LQ.Idle.bonus === 'function') LQ.Idle.bonus('shooting', { x: reflect.x, y: reflect.y, mult });
+      game.spawnRipple(reflect.x, reflect.y, { strength: 1, rings: 3 });
+      game.audio.play('unlock', { degree: 3, gain: 0.9 });
+      reflect.life = 0;
+      return true;
     },
 
     draw(layer, ctx, game){
@@ -306,8 +395,8 @@
           ctx.drawImage(moonCv, game.moonX - G, game.moonY - G, G * 2, G * 2);
           ctx.globalAlpha = 1;
           // nuvem fina
-          if (game.has('sky_alive')){
-            ctx.fillStyle = P.light; ctx.globalAlpha = 0.08 * game.unlockFade('sky_alive');
+          if (cloudOn(game)){
+            ctx.fillStyle = P.light; ctx.globalAlpha = 0.08 * (game.has('sky_alive') ? game.unlockFade('sky_alive') : 1);
             ctx.beginPath(); ctx.ellipse(cloudX, game.moonY + R * 0.3, R * 3.2, R * 0.45, 0, 0, TAU); ctx.fill();
             ctx.beginPath(); ctx.ellipse(cloudX + R * 1.5, game.moonY + R * 0.55, R * 2, R * 0.3, 0, 0, TAU); ctx.fill();
             ctx.globalAlpha = 1;
@@ -317,18 +406,14 @@
 
       else if (layer === 'mountains'){
         const k = game.unlockFade('fog_clear');
-        if (k <= 0.01 || !mBack) return;
+        if (k <= 0.01 || !ridges.length) return;
         const px = game.mouse.x < 0 ? 0 : (game.mouse.x / W - 0.5) * 2; // parallax 2 px
         ctx.globalAlpha = k;
-        if (mColVer !== game.paletteVersion){ // cores só mudam com a paleta
-          mColVer = game.paletteVersion;
-          mColBack = lerpHex(P.horizon, P.zenith, 0.45);
-          mColFront = lerpHex(lerpHex(P.horizon, P.zenith, 0.85), P.dark, 0.25);
+        if (mColVer !== game.paletteVersion){ mColVer = game.paletteVersion; tintMountains(P); } // cores só mudam com a paleta
+        for (const m of ridges){
+          ctx.fillStyle = m.col;
+          ctx.translate(px * m.par, 0); ctx.fill(m.path); ctx.translate(-px * m.par, 0);
         }
-        ctx.fillStyle = mColBack;
-        ctx.translate(px * 0.5, 0); ctx.fill(mBack); ctx.translate(-px * 0.5, 0);
-        ctx.fillStyle = mColFront;
-        ctx.translate(px, 0); ctx.fill(mFront); ctx.translate(-px, 0);
         ctx.globalAlpha = 1;
       }
 
@@ -364,7 +449,24 @@
           ctx.drawImage(sp, shoot.x - 10, shoot.y - 10, 20, 20);
           ctx.globalAlpha = 1;
         }
+        // reflexo clicável da cadente (idle): glow dourado pulsando, some em shootLife
+        if (reflect.life > 0){
+          const f = Math.min(1, reflect.life / reflect.max * 1.5); // fade só no último terço
+          const pulse = 0.8 + 0.2 * Math.sin(game.t * 9);
+          const r = 28 * pulse;
+          ctx.globalAlpha = 0.7 * f;
+          ctx.drawImage(game.sprite.glow(P.gold, 24), reflect.x - r, reflect.y - r, r * 2, r * 2);
+          ctx.globalAlpha = 0.9 * f;
+          ctx.drawImage(game.sprite.glow(P.light, 6), reflect.x - 5, reflect.y - 5, 10, 10);
+          ctx.globalAlpha = 1;
+        }
       }
     }
   });
+  // hooks read-only p/ teste (não alteram estado, exceto forceShoot que zera o relógio da cadente)
+  LQ.sky = {
+    info(){ return { stars: visibleN, shooting: shoot.active, shootTimer, reflect: reflect.life > 0 ? { x: reflect.x, y: reflect.y, life: reflect.life } : null, moonRise,
+      moonScale: (LQ.game && LQ.game.mode === 'idle' && LQ.Idle && LQ.Idle.moon) ? (LQ.Idle.moon() || { scale: 1 }).scale : 1, ridges: ridges.length, auroraBands }; },
+    forceShoot(){ shootTimer = 0; }
+  };
 })();
