@@ -118,8 +118,10 @@ LQ.Idle = (function(){
     shopW = el && el.classList.contains('open') ? el.offsetWidth : 0;
   }
   // Ponto aleatório na água, fora do painel da loja e acima da barra (H-90)
+  // Loja em tela cheia (≤600px: shopW ≥ W) cobre tudo: ignora-a (senão x degenera para [20,60], atrás do painel)
+  const shopCovers = () => shopW > 0 && game && shopW >= game.W;
   function lakePoint(){
-    const sw = shopW;
+    const sw = shopCovers() ? 0 : shopW;
     const x = 20 + game.rand() * Math.max(40, game.W - 40 - sw);
     const y = game.horizonY + 20 + game.rand() * Math.max(10, game.H - game.horizonY - 90);
     return { x, y };
@@ -161,7 +163,7 @@ LQ.Idle = (function(){
 
   // ---------- Ações ----------
   function buy(id, n){
-    const s = S(), g = gen(id); if (!s || !g) return false;
+    const s = S(), g = gen(id); if (!s || !g || prestigeBusy()) return false; // sinos do prestígio: nada se compra
     if (n === 'max') n = maxBuy(id); else n = Math.floor(n || 1);
     if (n < 1) return false;
     const c = genCost(id, n); if (c > s.cur) return false;
@@ -179,7 +181,7 @@ LQ.Idle = (function(){
     return true;
   }
   function buyUpgrade(id){
-    const s = S(), u = upgrade(id); if (!s || !u || !canBuyUpgrade(id)) return false;
+    const s = S(), u = upgrade(id); if (!s || !u || prestigeBusy() || !canBuyUpgrade(id)) return false;
     s.cur -= u.cost; s.ups.push(id); s.stats.purchases++; invalidate(); syncStoneStyle();
     game.audio.play('pulse', { degree: (s.ups.length) % 5, x: 0.5, y: 0.3, gain: 0.8 });
     emit('upgrade', { id, kind: u.kind, auto: false });
@@ -187,7 +189,7 @@ LQ.Idle = (function(){
   }
   // marcos automáticos: kind 'mult' com 'at' e sem custo → aplicado ao atingir a contagem
   function applyMilestones(){
-    const s = S(); if (!s) return;
+    const s = S(); if (!s || prestigeBusy()) return;
     for (const u of D().upgrades){
       if (u.kind !== 'mult' || u.cost != null || u.at == null || has(u.id)) continue;
       if (genCount(u.gen) >= u.at){
@@ -325,7 +327,7 @@ LQ.Idle = (function(){
     gen, upgrade, genCount, genMult, genRate, genCost, maxBuy, canBuy, buy, save,
     upgradeAvailable, canBuyUpgrade, buyUpgrade, has,
     prestigePoints, claimPrestige, checkGoals,
-    visible, moon, lakePoint, shopWidth: () => shopW, bonus, combo: () => combo, resetCombo,
+    visible, moon, lakePoint, shopWidth: () => shopW, shopCovers, bonus, combo: () => combo, resetCombo,
     on, off, emit,
     get state(){ return S(); }
   };

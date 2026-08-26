@@ -20,7 +20,8 @@ window.LQ = window.LQ || {};
   function lakePoint(game){
     if (typeof LQ.Idle.lakePoint === 'function'){ const p = LQ.Idle.lakePoint(); if (p && Number.isFinite(p.x)) return p; }
     const el = document.getElementById('shop');
-    const sw = (el && el.classList.contains('open')) ? el.offsetWidth : 0; // hud marca #shop.open
+    let sw = (el && el.classList.contains('open')) ? el.offsetWidth : 0; // hud marca #shop.open
+    if (sw >= game.W) sw = 0; // loja em tela cheia cobre tudo
     return { x: 20 + game.rand() * Math.max(40, game.W - 40 - sw), y: game.horizonY + 20 + game.rand() * Math.max(10, game.H - game.horizonY - 90) };
   }
   function spawn(game){
@@ -55,6 +56,7 @@ window.LQ = window.LQ || {};
       }
       if (timer < 0) nextTimer(game);
       if (document.hidden) return; // não nasce com a aba escondida
+      if (typeof LQ.Idle.shopCovers === 'function' && LQ.Idle.shopCovers()) return; // loja em tela cheia (celular): ninguém veria
       timer -= dt;
       if (timer <= 0) spawn(game);
     },

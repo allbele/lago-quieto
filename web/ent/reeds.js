@@ -158,15 +158,17 @@ window.LQ = window.LQ || {};
   LQ.register('reeds', def);
 
   // API para outras entidades (vagalumes): pontas dos juncos visíveis; visible(): quantos aparecem agora
+  // perches: array cacheado (reconstruído só quando nL/nR mudam); x/y atualizados na leitura, sem alocar
+  const perchCache = []; let perchL = -1, perchR = -1;
   LQ.reeds = {
     perches(game){
-      const out = [];
       const nL = countL(game), nR = countR(game);
-      for (const r of reeds){
-        if (!visibleReed(r, nL, nR)) continue;
-        out.push({ x: r.wx, y: r.wy, reed: r });
+      if (nL !== perchL || nR !== perchR){
+        perchL = nL; perchR = nR; perchCache.length = 0;
+        for (const r of reeds) if (visibleReed(r, nL, nR)) perchCache.push({ x: r.wx, y: r.wy, reed: r });
       }
-      return out;
+      for (const p of perchCache){ p.x = p.reed.wx; p.y = p.reed.wy; }
+      return perchCache;
     },
     visible(){ const g = LQ.game; return g ? countL(g) + countR(g) : 0; },
     sides(){ const g = LQ.game; return g ? { L: countL(g), R: countR(g) } : { L: 0, R: 0 }; }

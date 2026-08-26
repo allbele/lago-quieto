@@ -111,14 +111,14 @@ window.LQ = window.LQ || {};
     if (key === 'fish') return 'O peixe comeu a pedra!' + (m ? ' ×' + m : '');
     if (key === 'glint') return 'Brilho dourado! +' + fmt(amt || 0);
     if (key === 'shooting') return 'Reflexo da cadente!' + (m ? ' ×' + m : ' ×25');
-    if (key === 'combo') return 'Ritmo! Pedras em cadência ×' + (m || 1.5);
+    if (key === 'combo') return 'Ritmo! Pedras em cadência rendem mais'; // sem número: o multiplicador segue subindo no HUD
     return 'Bônus! +' + fmt(amt || 0);
   }
 
   // ---------- entidade ----------
   const H = {
     hud: null, shop: null, list: null, ups: null, prest: null, toast: null, card: null,
-    qty: 1, open: false, throttle: 0, toastT: 0, dirty: true, hintT: 0, hintOn: false,
+    qty: 1, open: false, throttle: 0, toastT: 0, toastGap: 0, toastQ: [], dirty: true, hintT: 0, hintOn: false,
     rows: {}, upRows: {}, cardFor: null, lpTimer: 0, hoverTimer: 0, comboMult: 1,
     subs: [],   // unsubscribes do barramento do motor
     floats: [], // pool de floaters
@@ -226,6 +226,10 @@ window.LQ = window.LQ || {};
       this.rows = {}; this.upRows = {};
       for (const g of D().gens){
         const r = el('div', 'gen'); r.hidden = true;
+        r.tabIndex = 0; r.setAttribute('role', 'button'); r.setAttribute('aria-label', g.name || g.id); // comprável por teclado
+        r.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); this.clickGen(g); } });
+        r.addEventListener('focus', () => { if (this.game.ui) this.game.ui.wake(); this.showCard({ type: 'gen', id: g.id, g, el: r }); });
+        r.addEventListener('blur', () => this.hideCard());
         r.appendChild(icon(g.icon));
         const mid = el('div', 'mid');
         const top = el('div', 'top'); const name = el('span', 'name', g.name || g.id); const cnt = el('span', 'n', '0');
@@ -333,7 +337,7 @@ window.LQ = window.LQ || {};
     },
 
     clickGen(g){
-      const s = st(this.game); if (!s) return;
+      const s = st(this.game); if (!s || (LQ.IdlePrestige && LQ.IdlePrestige.busy)) return;
       const n = s.gens[g.id] || 0;
       let q = this.qty === 'max' ? maxAffordable(g, n, s.cur) : this.qty;
       if (q < 1) return;
@@ -362,8 +366,14 @@ window.LQ = window.LQ || {};
       if (b.classList.contains('hint') !== on) b.classList.toggle('hint', on);
     },
     // toast curto: ícone (id de symbol ou path) + 1 frase, `sec` segundos
+    // Um slot só: se já há um toast visível, o novo entra numa fila curta (≤3) e aparece quando o atual acabar
+    // (evita a dica da loja ser engolida pelo toast de combo, que costuma chegar no mesmo segundo).
     showToast(ico, txt, sec){
       if (!this.toast) return;
+      if (this.toastT > 0 || this.toastGap > 0){
+        if (this.toastQ.length < 3 && this.toastTxt.textContent !== txt && !this.toastQ.some(q => q[1] === txt)) this.toastQ.push([ico, txt, sec]);
+        return;
+      }
       this.toastIco.textContent = '';
       this.toastIco.appendChild(ico && ico.indexOf('ic-') === 0 ? icon(ico) : pathIcon(ico || RING));
       this.toastTxt.textContent = txt;
@@ -412,7 +422,8 @@ window.LQ = window.LQ || {};
       if (game.mode !== 'idle' || !this.hud) return;
       for (const f of this.floats) if (f.age < 1) f.age += dt / (f.gold ? FLOAT_LIFE_GOLD : FLOAT_LIFE);
       if (this.hintOn) this.hintT += dt;
-      if (this.toastT > 0){ this.toastT -= dt; if (this.toastT <= 0) this.toast.classList.remove('show'); }
+      if (this.toastT > 0){ this.toastT -= dt; if (this.toastT <= 0){ this.toast.classList.remove('show'); this.toastGap = this.toastQ.length ? 0.5 : 0; } }
+      else if (this.toastGap > 0){ this.toastGap -= dt; if (this.toastGap <= 0 && this.toastQ.length){ const q = this.toastQ.shift(); this.showToast(q[0], q[1], q[2]); } }
       this.throttle += dt;
       if (this.throttle >= 0.1){ this.throttle = 0; this.render(game, false); }
     },

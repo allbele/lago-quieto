@@ -17,7 +17,7 @@ You are sitting on the shore of a lake at night, tossing pebbles into the water 
 [b]There is no goal, no score and no way to lose.[/b] The game never asks anything of you — it only answers. The longer you stay, the more alive the lake becomes. And it keeps living after you close the window: when you return, a cascade of rings tells you what happened while you were gone.
 
 [h3]Two modes[/h3]
-On launch you choose between 🌙 [b]Zen[/b] — just click and watch, no numbers, the original experience — and ⚡ [b]Idle[/b], a progression clicker with generators (fireflies, fish, lilies…), upgrades and prestige at dawn. Both share the same lake; switch whenever you like.
+On launch you choose between 🌙 [b]Zen[/b] — just click and watch, no numbers, the original experience — and ⚡ [b]Idle[/b], a progression clicker with generators (fireflies, fish, lilies…), upgrades and prestige at dawn. In Idle every purchase visibly grows the lake — more fish, fireflies and reeds, mountains on the horizon, a bigger moon. Both share the same lake; switch whenever you like.
 
 [h3]What you'll find[/h3]
 [list]
@@ -26,7 +26,7 @@ On launch you choose between 🌙 [b]Zen[/b] — just click and watch, no number
 [*][b]Ambient mode.[/b] Leave it open: the UI fades, the cursor disappears and the lake becomes a living soundscape.
 [*][b]100% synthesized audio.[/b] No samples — every plop, cricket and note is generated in real time.
 [*][b]Zero on-screen text.[/b] No tutorial, no numbers, no notifications. Just icons and water.
-[*][b]Optional Idle mode.[/b] Generators, upgrades and prestige for those who want to watch the lake grow in numbers — or stay in Zen and never see one.
+[*][b]Optional Idle mode.[/b] Generators, upgrades and prestige for those who want to watch the lake grow in numbers — or stay in Zen and never see one. Four hidden bonus clicks (a fish eats your pebble, a golden glint, the right rhythm, a shooting star) and Fish Food to speed the lake up.
 [/list]
 
 [h3]What the Steam version adds[/h3]
@@ -47,7 +47,7 @@ Quiet Lake is [b]free and complete on the web[/b]: [url=https://allbele.github.i
 3. Gentle idle progression: the lake keeps living while you're away.
 4. Fully synthesized audio and Canvas 2D visuals — light on any machine.
 5. Steam extras: 12 achievements, 4 themes, cloud saves and wallpaper mode.
-6. Two modes: 🌙 Zen (just click and watch) and ⚡ Idle (generators, upgrades, prestige).
+6. Two modes: 🌙 Zen (just click and watch) and ⚡ Idle (generators, upgrades, prestige; the lake grows with every purchase, 4 bonus clicks, Fish Food).
 
 ## System requirements
 

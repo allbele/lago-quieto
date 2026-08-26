@@ -5,7 +5,7 @@
 
 ## Agora
 - **JOGO NO AR:** **https://allbele.github.io/lago-quieto/** · espelho Artifact: indisponível (dois links sumiram logo após publicar; investigar depois — não bloqueia nada)
-- **Fase atual:** 7 — **Idle v2** (loja legível com nomes/descrições/marcos, populações que crescem com as compras, 4 tipos de clique bônus) — *em execução*. Plano em `PLANO-IDLE-V2.md`. Steam segue aguardando a conta.
+- **Fase atual:** 7 concluída ✅ — **Idle v2 publicado** em https://allbele.github.io/lago-quieto/ (loja legível, lago que cresce a cada compra, 4 cliques bônus). Steam segue aguardando a conta do usuário.
 - **Jogo:** **Lago Quieto** (*Quiet Lake*) — "Jogue uma pedra. O lago faz o resto." · slug `lago-quieto`
 - **Você precisa fazer:** nada.
 - **Próximo entregável:** upload para a Steam — só depois de você criar a conta Steamworks e me passar o App ID / Depot IDs.
@@ -48,6 +48,7 @@
 - **26/08 · Tropeço de processo:** o 1º workflow do Idle v2 rodou com o "modo de planejamento" ainda ativo → 9 agentes só escreveram planos (código pronto em `scripts/planos-agentes/`), nenhum arquivo do jogo mudou. Saída formal do plan mode e relançamento (`lq-idle-v2-apply`) aplicando esses planos + 8 correções cruzadas (fórmula de população sem salto na 1ª compra, onResize, stats.bonuses, peixe come a pedra com janela 2,2 s, hooks de teste, lakePoint fora da loja).
 - **26/08 · Idle v2 aplicado (9 agentes, 70 min, 19 achados corrigidos).** Loja 300 px com nome, descrição do efeito visual e card de marcos (✓/próximo); populações por fórmula `base + floor(log2(n))·k` (vagalumes 3→15, peixes até 8+3 dourados, juncos 3→15, lírios até 12, sapos 5, estrelas 200, 4 cordilheiras, lua cresce até 1.4×, aurora 2 faixas); bônus: peixe come a pedra (×2, ×3 no marco 10, ×4 com Ração — pedra vira pontinhos; paga em função da taxa), brilho dourado (rate×60), combo de ritmo (arco no HUD, ×1.9 a 0,8 s), reflexo de estrela cadente (×25); toasts na 1ª vez de cada. Zen verificado intocado. 58-60 FPS a 1440p. Workflow final de testes/entrega lançado.
 - **26/08 19:55 · Limite da assinatura de novo** (reseta 22:00). Workflow final `lq-idle-v2-test` (run wf_a8f2a0f4-8be): 22/25 concluídos — 3 testadores (19 achados) + 16 verificações céticas (16 confirmados). Faltam: corretor, screenshots+bundle, build Mac+textos. Nada parcial no disco. Retomada agendada para ~22:05 com `resumeFromRunId`; depois push para o GitHub Pages.
+- **26/08 · Workflow final concluído (25 agentes, retomado após o reset).** 16 achados corrigidos: chuva de saltos de peixe (cooldown 6 s, salto só por pedra), fila de toasts, save durante sinos do prestígio, `reconcile` de unlocks × geradores ao carregar, aurora recortada em telas grandes, zero realocação de canvas em transições, reflexo da lua com bordas suaves, peixes fora da barra, tela de escolha com legendas "contemplar/cultivar", acessibilidade (Tab/Enter na loja), glint não nasce sob loja em tela cheia, `perches` preguiçoso, aurora com sprite de coluna. Screenshots 13-16, bundle 258 KB, build Mac refeito e aberto, textos PT/EN/README com "lago cresce" + 4 bônus + Ração. **Publicado via push.**
 - Este diário criado a pedido do usuário: "salva em um .md também, atualizado dinamicamente, com lembranças do que já foi, por onde passou".
 
 ---

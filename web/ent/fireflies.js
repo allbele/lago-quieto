@@ -39,6 +39,7 @@ window.LQ = window.LQ || {};
       x: 0, y: 0, fx: 0, fy: 0, flee: 10, shine: 10,         // fuga e brilho (timers)
       state: 0, perch: null, st: 0, land: 0, px: 0, py: 0,    // 0 voa, 1 pousando, 2 pousado, 3 decolando
       sx: 0, sy: 0, wait: 8 + rnd() * 20,                     // origem do pouso; espera até tentar pousar
+      fpx: 0, fpy: 0,                                         // última posição livre (freePos)
       born: -1                                                // game.t do nascimento (fade)
     };
   }
@@ -48,11 +49,11 @@ window.LQ = window.LQ || {};
     return Math.min(MAX, vis(game, 'vagalume', zen));
   }
 
+  // posição livre → escrita em f.fpx/f.fpy (sem alocar um objeto por vagalume por frame)
   function freePos(f, game){
     const W = game.W, hy = game.horizonY, wh = game.H - hy, t = game.t;
-    const x = (f.bx + f.ax * (Math.sin(t * f.f1 + f.p1) + 0.5 * Math.sin(t * f.f2 + f.p2))) * W;
-    const y = hy + (f.by + f.ay * (Math.sin(t * f.f1 * 1.3 + f.p3) + 0.5 * Math.sin(t * f.f2 * 0.8 + f.p4))) * wh;
-    return { x, y };
+    f.fpx = (f.bx + f.ax * (Math.sin(t * f.f1 + f.p1) + 0.5 * Math.sin(t * f.f2 + f.p2))) * W;
+    f.fpy = hy + (f.by + f.ay * (Math.sin(t * f.f1 * 1.3 + f.p3) + 0.5 * Math.sin(t * f.f2 * 0.8 + f.p4))) * wh;
   }
 
   function chime(game, x, g){
@@ -86,25 +87,26 @@ window.LQ = window.LQ || {};
         for (let i = n; i < lastN; i++){ flies[i].born = -1; flies[i].state = 0; flies[i].perch = null; }
         lastN = n;
       }
-      const perches = (LQ.reeds && LQ.reeds.perches) ? LQ.reeds.perches(game) : [];
+      let perches = null; // pontas dos juncos: só quando algum vagalume vai tentar pousar (a cada 10–40 s), não por frame
       const W = game.W, H = game.H;
       // pousar nos juncos: fase 6 (fireflies2, §3) ou, no idle, marco de 5 vagalumes comprados
       const canPerch = game.has('fireflies2') || gc(game, 'vagalume') >= 5;
       for (let i = 0; i < MAX; i++){
         const f = flies[i];
         if (i >= n || f.born < 0 || t < f.born) continue;
-        if (f.woke === false){ f.woke = true; const p0 = freePos(f, game); chime(game, p0.x, 1); }
+        if (f.woke === false){ f.woke = true; freePos(f, game); chime(game, f.fpx, 1); }
         f.flee += dt; f.shine += dt;
         f.bx += f.drift * dt; if (f.bx < 0.02 || f.bx > 0.98) f.drift = -f.drift;
-        const fp = freePos(f, game);
+        freePos(f, game);
 
         if (f.state === 0){
           f.wait -= dt;
-          if (f.wait <= 0 && perches.length && canPerch && rnd() < 0.5){
+          if (f.wait <= 0 && canPerch && !perches) perches = (LQ.reeds && LQ.reeds.perches) ? LQ.reeds.perches(game) : [];
+          if (f.wait <= 0 && canPerch && perches.length && rnd() < 0.5){
             f.perch = perches[Math.floor(rnd() * perches.length)].reed;
             f.state = 1; f.st = 0; f.sx = f.x; f.sy = f.y;
           } else if (f.wait <= 0) f.wait = 10 + rnd() * 20;
-          f.x = fp.x; f.y = fp.y;
+          f.x = f.fpx; f.y = f.fpy;
         } else if (f.state === 1){
           // Pousando: 2,5 s de aproximação suave até a ponta do junco
           f.st += dt;

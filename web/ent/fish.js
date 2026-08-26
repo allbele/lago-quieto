@@ -10,6 +10,10 @@
   const CURVE_R = 250;       // raio de atração dos anéis
   const N_NORMAL = 8, N_GOLD = 3; // pool: normais 0..7, dourados 8..10
   const EAT_T = 2.2;         // janela para alcançar a pedra (s)
+  const JUMP_CD = 6;         // s mínimos entre saltos do mesmo peixe (anéis não viram chuva de saltos)
+  const JUMP_SND_GAP = 1;    // s mínimos entre sons 'fishJump' (global; o dourado/refeição sempre toca)
+  const UI_BAND = 72;        // px acima da borda inferior reservados à barra de ícones
+  let lastJumpSnd = -1e9;
 
   const fish = [];
   let goldSeen = false;
@@ -35,13 +39,13 @@
       p0: null, p1: null, p2: null, p3: null, u: 0, dur: 6,   // curva atual
       pull: null, pullT: 0,                                    // atração ao anel
       target: null, ate: false, shown: -1,                     // pedra a comer; salto de refeição; t em que apareceu (idle)
-      jumping: 0, jx: 0, jy: 0, jumped: false, jumpTimer: 0,
+      jumping: 0, jx: 0, jy: 0, jumped: false, jumpTimer: 0, jumpCd: 0, pullJump: false, // pullJump: atração veio de pedra (clique) → pode saltar ao chegar
       diving: 0, dx: 0, dy: 0, tx: 0, ty: 0, born: false };
     for (let i = 0; i < TRAIL; i++) f.trail.push({ x: 0, y: 0 });
     return f;
   }
   function waterBand(game){
-    const top = game.horizonY + 24, bot = game.H - 30;
+    const top = game.horizonY + 24, bot = game.H - UI_BAND; // nunca por cima da barra inferior
     return { top, bot };
   }
   function randPoint(game){
@@ -76,8 +80,9 @@
     f.trail[0].x = f.x; f.trail[0].y = f.y;
   }
   function startJump(f, game){
-    f.jumping = 1e-6; f.jumped = false; f.jx = f.x; f.jy = f.y;
-    game.audio.play(f.gold || f.ate ? 'fishJumpGold' : 'fishJump', { x: f.x / game.W, y: 0.4, gain: 1 });
+    f.jumping = 1e-6; f.jumped = false; f.jx = f.x; f.jy = f.y; f.jumpCd = JUMP_CD;
+    if (f.gold || f.ate) game.audio.play('fishJumpGold', { x: f.x / game.W, y: 0.4, gain: 1 });
+    else if (game.t - lastJumpSnd >= JUMP_SND_GAP){ lastJumpSnd = game.t; game.audio.play('fishJump', { x: f.x / game.W, y: 0.4, gain: 1 }); }
     if (f.gold && !goldSeen){ goldSeen = true; game.achievement('golden_fish'); }
   }
   // Idle: peixe alcançou a pedra → salto dourado e bônus (×2; ×3 com 10 peixes; ×4 com ração)
@@ -173,6 +178,7 @@
         if (act.indexOf(i) < 0){ f.alpha = 0; continue; }
         f.alpha = 0.35 * fadeOf(f, game);
         if (!f.p0) newPath(f, game);
+        if (f.jumpCd > 0) f.jumpCd -= dt;
 
         // Mergulho (clique): invisível, reaparece adiante
         if (f.diving > 0){
@@ -220,7 +226,8 @@
             }
           }
           if (!ate && (f.pullT <= 0 || d < 20)){
-            if (game.calm > 8 && d < 40 && f.pullT > 0) startJump(f, game);
+            // salto ao chegar: só se a atração veio de uma pedra (não de anéis automáticos/orvalho) e fora do cooldown
+            if (game.calm > 8 && d < 40 && f.pullT > 0 && f.pullJump && f.jumpCd <= 0) startJump(f, game);
             f.pull = null;
             if (f.pullT <= 0) f.target = null;
           }
@@ -255,7 +262,7 @@
         if (d < bd){ bd = d; best = f; }
       }
       if (best){
-        best.pull = { x, y }; best.pullT = 1.5 + game.rand() * 0.5;
+        best.pull = { x, y }; best.pullT = 1.5 + game.rand() * 0.5; best.pullJump = false;
         // recomeça a curva a partir de onde está para a atração não brigar com o Bézier
         best.p0 = { x: best.x, y: best.y }; best.u = 0;
         best.p3 = { x: x + (game.rand() - 0.5) * 120, y: y + (game.rand() - 0.5) * 40 };
@@ -268,8 +275,12 @@
     },
     // Idle: pedra caiu (onRipple já puxou o mais próximo) → marca o alvo para a refeição
     onImpact(p, game){
-      if (game.mode !== 'idle' || !p || p.source !== 'stone') return;
-      const act = activeIdx(game);
+      if (!p || p.source !== 'stone') return;
+      const act0 = activeIdx(game);
+      // pedra (clique): o peixe que onRipple acabou de puxar para este ponto pode saltar ao chegar
+      for (const i of act0){ const f = fish[i]; if (f.pull && f.pull.x === p.x && f.pull.y === p.y) f.pullJump = true; }
+      if (game.mode !== 'idle') return;
+      const act = act0;
       let best = null, bd = CURVE_R;
       for (const i of act){
         const f = fish[i];

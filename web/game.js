@@ -132,7 +132,9 @@ window.LQ = window.LQ || {};
     // aba oculta: credita a ausência até agora (sem contar duas vezes)
     if (hiddenAt){ s.totalTime += Math.min((Date.now() - hiddenAt) / 1000, OFFLINE_CAP); hiddenAt = Date.now(); }
     s.lastSeen = Date.now();
-    const json = JSON.stringify(s);
+    // sinos do prestígio: a cena viva ainda tem unlocked cheio mas gens já vazios → grava com o patch do prestígio
+    const patch = game.mode === 'idle' && LQ.IdlePrestige ? LQ.IdlePrestige.savePatch : null;
+    const json = JSON.stringify(patch ? Object.assign({}, s, patch) : s);
     if (LQ.Platform && LQ.Platform.saveCloud) LQ.Platform.saveCloud(json, SAVE_KEY);
     else try { localStorage.setItem(SAVE_KEY, json); } catch (e) {}
   }
@@ -226,8 +228,10 @@ window.LQ = window.LQ || {};
   function rebuildOffscreens(){
     const P = game.palette, W = game.W, H = game.H, hy = game.horizonY;
     if (!skyCv){ skyCv = document.createElement('canvas'); waterCv = document.createElement('canvas'); fogCv = document.createElement('canvas'); }
+    // width/height só mudam quando o tamanho muda (reatribuir realoca o backing store; repintar por cima não)
+    const size = (c, w, h) => { if (c.width !== w || c.height !== h){ c.width = w; c.height = h; } };
     // Céu: gradiente vertical zênite → horizonte (+ rosa do amanhecer)
-    skyCv.width = W; skyCv.height = hy;
+    size(skyCv, W, hy);
     let g = skyCv.getContext('2d');
     let grad = g.createLinearGradient(0, 0, 0, hy);
     grad.addColorStop(0, P.zenith);
@@ -235,7 +239,7 @@ window.LQ = window.LQ || {};
     grad.addColorStop(1, lerpHex(P.horizon, P.dawn, game.dawnPink * 0.5));
     g.fillStyle = grad; g.fillRect(0, 0, W, hy);
     // Água: horizonte (profundo) → margem
-    waterCv.width = W; waterCv.height = H - hy;
+    size(waterCv, W, H - hy);
     g = waterCv.getContext('2d');
     grad = g.createLinearGradient(0, 0, 0, H - hy);
     grad.addColorStop(0, lerpHex(P.horizon, P.dawn, game.dawnPink * 0.25));
@@ -243,8 +247,8 @@ window.LQ = window.LQ || {};
     grad.addColorStop(1, P.shore);
     g.fillStyle = grad; g.fillRect(0, 0, W, H - hy);
     // Névoa baixa: faixa com gradiente cacheado (ent/fog.js anima alpha/offset)
-    fogCv.width = W + 40; fogCv.height = Math.round(H * 0.22);
-    g = fogCv.getContext('2d');
+    size(fogCv, W + 40, Math.round(H * 0.22));
+    g = fogCv.getContext('2d'); g.clearRect(0, 0, fogCv.width, fogCv.height); // a névoa tem alfa: limpar antes de repintar
     grad = g.createLinearGradient(0, 0, 0, fogCv.height);
     grad.addColorStop(0, P.fog + '00');
     grad.addColorStop(0.5, P.fog + '70'); // pico suave: névoa fina, não faixa
@@ -301,7 +305,9 @@ window.LQ = window.LQ || {};
     }
     if (changed){
       paletteDirty = true; game.paletteVersion++;
-      for (const k in glowCache) delete glowCache[k]; // sprites dependem da cor; evita cache crescer
+      // a chave do sprite já inclui a cor: entradas antigas só deixam de ser usadas. Limpa apenas se crescer demais
+      // (rampa de dawn/troca de tema a 2 Hz não precisa realocar sprites a cada passo).
+      if (Object.keys(glowCache).length > 96) for (const k in glowCache) delete glowCache[k];
     }
   }
 
@@ -480,8 +486,14 @@ window.LQ = window.LQ || {};
     const P = game.palette, hy = game.horizonY;
     const len = Math.min(game.H - hy, game.moonR * 8);
     const baseW = game.moonR * 2.2 + 40; // ~80 px
-    ctx.fillStyle = P.light;
-    // Cintilações: fatias com jitter (largura/alpha por hash) e ~30% puladas; eco = passo 8 px.
+    // Bordas laterais suaves: gradiente horizontal (transparente → claro → transparente) centrado na lua,
+    // para as fatias não lerem como retângulos/painel. Tema claro (tinta, 'multiply'): alfa bem menor.
+    const gx = game.moonX;
+    const grad = ctx.createLinearGradient(gx - baseW * 0.5, 0, gx + baseW * 0.5, 0);
+    grad.addColorStop(0, P.light + '00'); grad.addColorStop(0.5, P.light); grad.addColorStop(1, P.light + '00');
+    ctx.fillStyle = grad;
+    const aMax = game.lightBlend === 'multiply' ? 0.035 : 0.075;
+    // Cintilações: fatias com largura contínua (onda lenta em y, não hash por fatia) e ~30% puladas; eco = passo 8 px.
     // Nunca uma coluna contínua nem um retângulo único.
     const slice = game.eco ? 8 : 4, n = Math.floor(len / slice);
     const t = game.t, tick = Math.floor(t * 6);
@@ -489,11 +501,11 @@ window.LQ = window.LQ || {};
       const h1 = hash(i * 7 + 1), h2 = hash(i * 13 + tick);
       if (h2 < 0.3) continue; // fatia apagada
       const y = hy + i * slice, f = 1 - i / n;
-      const w = baseW * (0.35 + 0.65 * (1 - f)) * (0.6 + 0.4 * h1);
-      const dx = Math.sin(y * 0.15 + t * 2) * 2 + rippleOffset(game.moonX, y);
+      const w = baseW * (0.35 + 0.65 * (1 - f)) * (0.72 + 0.28 * Math.sin(y * 0.06 + t * 0.9 + h1 * 0.8));
+      const dx = Math.sin(y * 0.15 + t * 2) * 2 + rippleOffset(gx, y);
       const tw = 0.5 + 0.5 * Math.sin(t * 2.2 + i * 1.7 + h1 * 6.28);
-      ctx.globalAlpha = 0.10 * Math.pow(f, 1.6) * tw;
-      ctx.fillRect(game.moonX + dx - w * 0.5, y, w, slice - 1);
+      ctx.globalAlpha = aMax * Math.pow(f, 1.6) * tw;
+      ctx.fillRect(gx + dx - w * 0.5, y, w, slice - 1);
     }
     ctx.globalAlpha = 1;
   }
@@ -628,6 +640,9 @@ window.LQ = window.LQ || {};
       document.querySelectorAll('.ico').forEach(b => {
         b.addEventListener('click', e => { e.stopPropagation(); UI.act(b.dataset.act); });
       });
+      // teclado: Tab num ícone (ou numa linha da loja) mostra a barra — nunca se ativa nada às cegas
+      ui.addEventListener('focusin', () => UI.wake());
+      const shop = document.getElementById('shop'); if (shop) shop.addEventListener('focusin', () => UI.wake());
       UI.applyClasses();
       UI.refreshCollection(null, true);
     },
@@ -653,7 +668,8 @@ window.LQ = window.LQ || {};
         // confirmação: 1º clique arma (ícone aceso por 2 s), 2º clique troca — evita trocar por engano ao jogar pedra perto da barra
         const b = document.getElementById('btn-mode');
         if (!UI.modeArmed){
-          UI.modeArmed = true; if (b) b.classList.add('arm');
+          UI.modeArmed = true; if (b){ b.classList.add('arm'); b.title = 'toque de novo para trocar de modo'; }
+          if (LQ.hud && typeof LQ.hud.showToast === 'function' && game.mode === 'idle') LQ.hud.showToast(null, 'Toque de novo para voltar ao lago zen', 2);
           clearTimeout(UI.modeTimer);
           UI.modeTimer = setTimeout(() => { UI.modeArmed = false; if (b) b.classList.remove('arm'); }, 2000);
           return;
@@ -671,11 +687,12 @@ window.LQ = window.LQ || {};
       b.classList.toggle('mode-zen', game.mode === 'zen');
       b.classList.toggle('mode-idle', game.mode === 'idle');
     },
-    wake(){ UI.hideTimer = 0; document.body.classList.remove('uihidden'); },
+    hidden: false, // espelho de body.uihidden (evita reescrever o atributo class a cada frame)
+    wake(){ UI.hideTimer = 0; if (UI.hidden){ UI.hidden = false; document.body.classList.remove('uihidden'); } },
     update(dt){
       game.mouse.idleFor += dt;
       if (UI.hover || UI.pinned) UI.hideTimer = 0; else UI.hideTimer += dt;
-      if (UI.hideTimer > 3) document.body.classList.add('uihidden');
+      if (UI.hideTimer > 3 && !UI.hidden){ UI.hidden = true; document.body.classList.add('uihidden'); }
       document.body.classList.toggle('nocursor', game.mouse.idleFor > 120);
     },
     // Coleção: um ícone por morador acordado; `newIcon` nasce com fade
@@ -798,13 +815,17 @@ window.LQ = window.LQ || {};
     const d = document.createElement('div');
     d.id = 'modepick';
     d.style.cssText = 'position:fixed;inset:0;z-index:20;background:#050914;display:flex;align-items:center;justify-content:center;gap:12vw;opacity:0;transition:opacity .6s ease';
-    const mk = (m, svg) => {
+    const mk = (m, svg, label, title) => {
       const b = document.createElement('button');
       b.dataset.mode = m;
-      b.style.cssText = 'width:min(28vw,180px);height:min(28vw,180px);border:0;background:transparent;padding:0;cursor:pointer;opacity:.6;transition:opacity .3s ease';
+      b.style.cssText = 'width:min(28vw,180px);border:0;background:transparent;padding:0;cursor:pointer;opacity:.6;transition:opacity .3s ease;display:flex;flex-direction:column;align-items:center;gap:1.2em';
       b.innerHTML = svg;
       const sv = b.firstChild;
-      sv.style.cssText = 'width:100%;height:100%;fill:none;stroke:#e9f2ff;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round';
+      sv.style.cssText = 'width:100%;height:min(28vw,180px);fill:none;stroke:#e9f2ff;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round';
+      // legenda mínima (uma palavra) — só dois ícones não dizem o que cada modo é
+      const lab = document.createElement('span'); lab.textContent = label;
+      lab.style.cssText = 'font:300 clamp(13px,2.2vw,17px) system-ui,sans-serif;letter-spacing:.18em;color:#e9f2ff;text-transform:lowercase';
+      b.appendChild(lab); b.setAttribute('aria-label', label); b.title = title;
       b.addEventListener('pointerenter', () => { b.style.opacity = '1'; });
       b.addEventListener('pointerleave', () => { b.style.opacity = '.6'; });
       b.addEventListener('click', () => {
@@ -815,8 +836,8 @@ window.LQ = window.LQ || {};
       });
       return b;
     };
-    d.appendChild(mk('zen', ICON_MOON));
-    d.appendChild(mk('idle', ICON_BOLT));
+    d.appendChild(mk('zen', ICON_MOON, 'contemplar', 'Zen: só olhar e jogar pedras; o lago acorda com o tempo'));
+    d.appendChild(mk('idle', ICON_BOLT, 'cultivar', 'Idle: anéis viram moeda; compre moradores para o lago'));
     document.body.appendChild(d);
     requestAnimationFrame(() => { d.style.opacity = '1'; });
   }
@@ -832,6 +853,8 @@ window.LQ = window.LQ || {};
     SAVE_KEY = SAVE_KEYS[game.mode];
     game.unlocksEnabled = game.mode !== 'idle';
     game.state = load();
+    // idle: unlocked deriva dos geradores (remove unlocks fantasmas antes de qualquer entidade ler game.has)
+    if (game.mode === 'idle' && LQ.IdleState && typeof LQ.IdleState.reconcile === 'function') LQ.IdleState.reconcile(game.state);
     game.platform = LQ.Platform || null;
     game.audio = LQ.Audio || audioStub;
     // Ganho offline (cap 8 h) + achievement de retorno após 24 h+

@@ -48,16 +48,30 @@ LQ.IdleState = (function(){
     return out;
   }
 
+  // Reconciliação: no idle a fonte de verdade é idle.gens — `unlocked` só pode ter ids cujo gerador tem count>0
+  // (save gravado no meio dos sinos do prestígio, ou de versão antiga, trazia unlocked cheio com gens vazios).
+  // Chamada pelo núcleo (LQ.start) ANTES do init das entidades, para céu/lua/névoa não lerem unlocks fantasmas.
+  function reconcile(state){
+    if (!state || typeof state !== 'object') return state;
+    state.idle = migrate(state.idle);
+    const D = LQ.IdleData; if (!D) return state;
+    const byUnlock = {};
+    for (const g of D.gens) if (g.unlock) byUnlock[g.unlock] = g.id;
+    if (Array.isArray(state.unlocked)) state.unlocked = state.unlocked.filter(id => byUnlock[id] && state.idle.gens[byUnlock[id]] > 0);
+    if (!(state.idle.gens.lirio > 0)) state.liliesBloomed = 0;
+    return state;
+  }
+
   // Entidade: garante o sub-estado e restaura a cena (peixe/lua/... conforme geradores comprados).
   // O núcleo já restaura `unlocked` do save; forceUnlock ignora ids já desbloqueados → sem duplicar.
   LQ.register('idle-state', {
     init(game){
       if (game.mode !== 'idle') return;
-      game.state.idle = migrate(game.state.idle);
+      reconcile(game.state);
       const D = LQ.IdleData; if (!D) return;
       for (const g of D.gens) if (game.state.idle.gens[g.id] > 0 && g.unlock) game.forceUnlock(g.unlock);
     }
   });
 
-  return { fresh, migrate };
+  return { fresh, migrate, reconcile };
 })();

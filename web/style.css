@@ -84,6 +84,7 @@ body.mode-idle #shop{display:flex}
 /* linha do gerador: ícone 28px · nome + contagem · frase · barra · taxa + custo */
 #shop .gen{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:6px;cursor:pointer;opacity:.6;transition:opacity .3s ease,background .3s ease}
 #shop .gen.can{opacity:1}
+#shop .gen:focus-visible{outline:1px solid rgba(233,242,255,.5);outline-offset:-1px;opacity:1}
 #shop .gen:not(.can){cursor:default}
 #shop .gen.hit,#shop .up.hit{background:rgba(233,242,255,.14)}
 #shop .top .n{display:inline-block;transition:transform .25s ease}

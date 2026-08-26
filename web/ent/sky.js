@@ -33,7 +33,7 @@
   // ---------- estrelas ----------
   const STAR_TOTAL = 200, DYN = 12;
   const stars = [];        // {nx, ny, size, phase, speed}
-  let starCv = null, starCvN = -1, starCvW = 0, starCvH = 0, starCvVer = -1;
+  let starCv = null, starCvN = -1, starCvW = 0, starCvH = 0, starCvLight = ''; // starCvLight: cor usada no bake (só ela importa)
   let visibleN = 15;
   let lastW = 0, lastH = 0;
 
@@ -52,6 +52,8 @@
 
   // ---------- aurora ----------
   let auroraCv = null, auroraCtx = null, auroraAt = -1, auroraK = -1, auroraBands = 1;
+  let auroraY0 = 0, auroraY1 = 1;   // fração [0,1] da altura do offscreen efetivamente pintada (recorte do drawImage)
+  const colSprites = {};            // coluna 2×(bh+4·step) já afunilada, por cor|bh (1 drawImage no lugar de 5 fillRect)
   const AURORA_HZ = 15;    // repinta o offscreen a 15 Hz (o blur do upscale esconde o passo)
   let noiseCv = null;      // sprite 256x256 de ruído azul-frio (quebra o banding das faixas escaladas)
   const NOISE_T = 256;
@@ -84,8 +86,9 @@
   function bakeStars(game, n){
     const W = game.W, hy = game.horizonY;
     if (!starCv) starCv = document.createElement('canvas');
-    starCv.width = W; starCv.height = hy;
+    if (starCv.width !== W || starCv.height !== hy){ starCv.width = W; starCv.height = hy; } // realoca só se o tamanho mudou
     const g = starCv.getContext('2d');
+    g.clearRect(0, 0, W, hy);
     g.fillStyle = game.palette.light;
     const settled = Math.max(0, n - DYN);
     for (let i = 0; i < settled; i++){
@@ -93,7 +96,7 @@
       g.globalAlpha = s.a * 0.8;
       g.fillRect(Math.round(s.nx * W), Math.round(s.ny * hy), s.size, s.size);
     }
-    starCvN = n; starCvW = W; starCvH = hy; starCvVer = game.paletteVersion;
+    starCvN = n; starCvW = W; starCvH = hy; starCvLight = game.palette.light;
   }
 
   // escala/halo da lua pelo gerador 'lua' (zen: 1 / gradiente atual)
@@ -117,8 +120,8 @@
     moonKey = key;
     const G = R * 3;
     if (!moonCv) moonCv = document.createElement('canvas'); // reutiliza o offscreen
-    moonCv.width = moonCv.height = G * 2;
-    const g = moonCv.getContext('2d');
+    if (moonCv.width !== G * 2 || moonCv.height !== G * 2) moonCv.width = moonCv.height = G * 2; // realoca só se o raio mudou
+    const g = moonCv.getContext('2d'); g.clearRect(0, 0, G * 2, G * 2);
     const hc = mp.gold ? lerpHex(game.palette.light, game.palette.gold, 0.5) : game.palette.light; // marco 25: halo dourado
     const a0 = mp.halo < 0 ? '55' : hexA(mp.halo * 0.6), a1 = mp.halo < 0 ? '18' : hexA(mp.halo * 0.17);
     const grad = g.createRadialGradient(G, G, R * 0.9, G, G, G);
@@ -178,7 +181,7 @@
   function ensureAurora(game){
     const w = Math.max(48, Math.round(game.W / 8)), h = Math.max(32, Math.round(game.horizonY / 2)); // 1/8: mais blur de graça
     if (!auroraCv){ auroraCv = document.createElement('canvas'); auroraCtx = auroraCv.getContext('2d'); }
-    if (auroraCv.width !== w || auroraCv.height !== h){ auroraCv.width = w; auroraCv.height = h; auroraAt = -1; }
+    if (auroraCv.width !== w || auroraCv.height !== h){ auroraCv.width = w; auroraCv.height = h; auroraAt = -1; for (const k in colSprites) delete colSprites[k]; }
   }
   // Sprite de ruído pré-gerado (64x64, azul frio, pixels aleatórios) — desenhado em tile sobre a aurora
   function ensureNoise(){
@@ -207,6 +210,17 @@
   // distintas por faixa, janela horizontal suave e faixas de baixo esmaecendo (sem 'degrau').
   // bands=2 (marco 'duas faixas' do idle): segunda cortina deslocada, mais fina e fraca, por cima.
   const TAPER = [0.25, 0.6, 1, 0.6, 0.25];
+  // sprite de coluna: os 5 rects do taper pintados uma vez (opacos, alpha relativa); no offscreen basta 1 drawImage
+  function colSprite(col, bh){
+    const key = col + '|' + bh.toFixed(2);
+    let c = colSprites[key]; if (c) return c;
+    if (Object.keys(colSprites).length > 64) for (const k in colSprites) delete colSprites[k]; // transições de paleta criam cores novas
+    const step = bh * 0.45, H = Math.ceil(bh + 4 * step);
+    c = document.createElement('canvas'); c.width = 2; c.height = H;
+    const g = c.getContext('2d'); g.fillStyle = col;
+    for (let i = 0; i < 5; i++){ g.globalAlpha = TAPER[i]; g.fillRect(0, i * step, 2, bh); }
+    c._step = step; colSprites[key] = c; return c;
+  }
   // qualidade do upscale da aurora: 'high' até ~1600 px de largura; acima disso 'low' (custo por área)
   const auroraQuality = game => game.W > 1600 ? 'low' : 'high';
   function auroraBandCount(game){ const v = vis(game, 'aurora'); const at = (POP().aurora || {}).bands2At || 10; return (v >= 0 && genN('aurora') >= at) ? 2 : 1; }
@@ -220,11 +234,12 @@
     g.clearRect(0, 0, w, h);
     const cols = [game.palette.auroraG, game.palette.auroraP];
     const sx = (game.W / 4) / w; // frequências em 'px de offscreen 1/4' (spec), independentes da escala real
+    let y0 = h, y1 = 0;
     for (let c = 0; c < bands; c++){
       const off = c * 0.37, ph = c * 2.1, gain = c ? 0.6 : 1;
       for (let b = 0; b < 6; b++){
-        g.fillStyle = cols[(b + c) % 2];
-        const yb = h * (0.08 + b * 0.13 + off * 0.2), bh = h * (0.14 - c * 0.04), step = bh * 0.45;
+        const yb = h * (0.08 + b * 0.13 + off * 0.2), bh = h * (0.14 - c * 0.04);
+        const sp = colSprite(cols[(b + c) % 2], bh), step = sp._step, top = 2 * step, sh = sp.height;
         const fadeB = b >= 4 ? (b === 4 ? 0.7 : 0.4) : 1;
         for (let x = 0; x < w; x += 2){
           const X = x * sx;
@@ -232,15 +247,14 @@
           const y = yb + Math.sin(X * 0.05 * (0.6 + b * 0.15) + t * 0.2 + b * 1.9 + ph) * h * 0.12
                        + Math.sin(X * 0.013 + t * 0.07 + b + ph) * h * 0.05;
           const win = Math.pow(Math.sin(Math.PI * (x + 1) / (w + 2)), 0.6); // janela horizontal
-          const base = (0.045 + 0.045 * a) * k * 0.55 * win * fadeB * gain / 1.6; // /1.6: 5 rects somam mais que 3
-          for (let i = 0; i < 5; i++){
-            g.globalAlpha = base * TAPER[i];
-            g.fillRect(x, y + (i - 2) * step, 2, bh);
-          }
+          g.globalAlpha = (0.045 + 0.045 * a) * k * 0.55 * win * fadeB * gain / 1.6; // /1.6: 5 rects somam mais que 3
+          g.drawImage(sp, x, y - top); // coluna já afunilada (TAPER)
+          if (y - top < y0) y0 = y - top; if (y - top + sh > y1) y1 = y - top + sh;
         }
       }
     }
     g.globalAlpha = 1;
+    auroraY0 = Math.max(0, Math.min(1, y0 / h)); auroraY1 = Math.max(auroraY0, Math.min(1, y1 / h));
   }
 
   LQ.register('sky', {
@@ -351,7 +365,7 @@
       const night = 1 - game.dayPhase; // estrelas somem de dia
 
       if (layer === 'sky'){
-        if (starCvN !== visibleN || starCvW !== W || starCvH !== hy || starCvVer !== game.paletteVersion) bakeStars(game, visibleN);
+        if (starCvN !== visibleN || starCvW !== W || starCvH !== hy || starCvLight !== game.palette.light) bakeStars(game, visibleN);
         if (night > 0.02){
           ctx.globalAlpha = night;
           ctx.drawImage(starCv, 0, 0);
@@ -384,8 +398,10 @@
         paintAurora(game, k);
         // upscale 8× de uma imagem já borrada: bilinear ('low') basta e custa ~40% menos em telas grandes
         ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = auroraQuality(game);
-        ctx.drawImage(auroraCv, 0, 0, W, hy * 0.7);
-        drawNoise(ctx, 0, 0, W, Math.ceil(hy * 0.7), 0.02 * k);
+        // só a faixa efetivamente pintada do offscreen (recorte → menos área rasterizada em 'screen')
+        const ah = auroraCv.height, sy0 = Math.floor(auroraY0 * ah), sy1 = Math.ceil(auroraY1 * ah), H7 = hy * 0.7;
+        if (sy1 > sy0) ctx.drawImage(auroraCv, 0, sy0, auroraCv.width, sy1 - sy0, 0, H7 * sy0 / ah, W, H7 * (sy1 - sy0) / ah);
+        drawNoise(ctx, 0, Math.floor(H7 * sy0 / ah), W, Math.ceil(H7 * (sy1 - sy0) / ah), 0.02 * k);
       }
 
       else if (layer === 'moon'){
@@ -428,12 +444,19 @@
           // aurora refletida
           const ka = game.eco ? 0 : game.unlockFade('aurora') * night;
           if (ka > 0.01 && auroraCv){
-            ctx.globalAlpha = 0.15 * night;
-            ctx.save(); ctx.translate(0, hy); ctx.scale(1, -1);
-            ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = auroraQuality(game);
-            ctx.drawImage(auroraCv, 0, -hy * 0.7, W, hy * 0.7);
-            ctx.restore();
-            drawNoise(ctx, 0, hy, W, Math.ceil(hy * 0.7), 0.01 * ka); // metade do alpha do céu
+            // Reflexo: em telas largas (>1600) só a metade inferior do offscreen (a parte que fica junto ao horizonte);
+            // o resto ficaria a mais de 1/3 da água, quase invisível a 0.15 de alfa, e custa ~2 ms/frame em 'screen'.
+            const ah = auroraCv.height, H7 = hy * 0.7;
+            const lo = W > 1600 ? Math.max(0.5, auroraY0) : auroraY0, hi = auroraY1;
+            const sy0 = Math.floor(lo * ah), sy1 = Math.ceil(hi * ah);
+            if (sy1 > sy0){
+              ctx.globalAlpha = 0.15 * night;
+              ctx.save(); ctx.translate(0, hy); ctx.scale(1, -1);
+              ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = auroraQuality(game);
+              ctx.drawImage(auroraCv, 0, sy0, auroraCv.width, sy1 - sy0, 0, -H7 * (ah - sy0) / ah, W, H7 * (sy1 - sy0) / ah); // linha sy0 → mesma altura de antes (espelho)
+              ctx.restore();
+              drawNoise(ctx, 0, hy + Math.floor(H7 * (1 - sy1 / ah)), W, Math.ceil(H7 * (sy1 - sy0) / ah), 0.01 * ka); // metade do alpha do céu
+            }
           }
           ctx.globalAlpha = 1;
         }

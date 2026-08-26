@@ -21,6 +21,8 @@ window.LQ = window.LQ || {};
   const BELLS = 5, BELL_GAP = 0.5; // 5 sinos em 2,5 s
 
   let game = null, bellTimer = 0, bellsLeft = 0, degree = 0, resetAt = 0, busy = false, bound = false;
+  // Enquanto busy, todo save do núcleo (autosave/visibilitychange/pagehide) aplica este patch à cópia gravada
+  const SAVE_PATCH = { unlocked: [], dawnAt: -1 };
 
   function idleState(){ return game && game.state ? game.state.idle : null; }
   function data(){ return LQ.IdleData || {}; }
@@ -79,6 +81,7 @@ window.LQ = window.LQ || {};
     if (s.stats && typeof s.stats === 'object') s.stats.bestRate = 0;
     // A cena viva fica intacta durante os sinos (LQ.resetScene limpa unlocked depois); só a cópia gravada
     // já vai com unlocked=[] — fechar a aba durante os sinos não deixa moradores acordados sem geradores.
+    // (game.js save() consulta LQ.IdlePrestige.savePatch enquanto busy, para o autosave não desfazer isto.)
     rotateTheme(s.prest.runs);
     applySkin(s.prest.runs);
     const patch = { unlocked: [] }; if (game.state && game.state.dawnAt !== undefined) patch.dawnAt = -1;
@@ -127,5 +130,5 @@ window.LQ = window.LQ || {};
     }
   });
 
-  LQ.IdlePrestige = { PRESTIGE_TINTS, PERMANENT_KINDS, points, request, applySkin, get busy(){ return busy; } };
+  LQ.IdlePrestige = { PRESTIGE_TINTS, PERMANENT_KINDS, points, request, applySkin, get busy(){ return busy; }, get savePatch(){ return busy ? SAVE_PATCH : null; } };
 })();
