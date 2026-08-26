@@ -1,3 +1,5 @@
+> **Correção do usuário (26/08): a loja NÃO fecha e NÃO sobrepõe o jogo. Ignorar trilho/recolher/overlay abaixo; em telas estreitas usar tela dividida (lago em cima, loja embaixo).**
+
 # Estudo — Loja persistente + rebalanceamento (Idle v3)
 
 ## 1. UX da loja
