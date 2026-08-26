@@ -1,0 +1,32 @@
+/* Lago Quieto — reset e UI */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#050914;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+body.nocursor,body.nocursor *{cursor:none!important}
+
+#lake{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+
+/* Barra inferior */
+#ui{position:fixed;left:0;right:0;bottom:18px;display:flex;justify-content:center;gap:14px;
+  pointer-events:none;opacity:1;transition:opacity 1s ease}
+body.uihidden #ui{opacity:0}
+.ico{pointer-events:auto;width:40px;height:40px;border:0;background:transparent;padding:8px;cursor:pointer;
+  opacity:.6;transition:opacity .3s ease}
+.ico:hover,.ico:focus-visible{opacity:1;outline:none}
+:root{--ico:#e9f2ff}
+.ico svg{width:100%;height:100%;fill:none;stroke:var(--ico,#e9f2ff);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+body.uihidden .ico{pointer-events:none}
+
+/* Estado do ícone de som */
+#btn-sound .off{display:none}
+body.muted #btn-sound .on{display:none}
+body.muted #btn-sound .off{display:inline}
+body.eco #btn-eco{opacity:1}
+
+/* Coleção: faixa dos moradores acordados */
+#collection{position:fixed;left:0;right:0;bottom:70px;display:flex;justify-content:center;gap:16px;
+  pointer-events:none;opacity:0;transform:translateY(6px);transition:opacity .8s ease,transform .8s ease}
+#collection.open{opacity:1;transform:none}
+body.uihidden #collection{opacity:0}
+#collection svg{width:26px;height:26px;fill:none;stroke:var(--ico,#e9f2ff);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;opacity:.7}
+#collection svg.new{animation:born 4s ease forwards}
+@keyframes born{from{opacity:0;transform:translateY(4px)}to{opacity:.7;transform:none}}

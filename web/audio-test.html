@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Lago Quieto — teste de áudio</title>
+<style>
+  body{font:14px system-ui,sans-serif;background:#0b1a33;color:#e9f2ff;margin:0;padding:24px;max-width:760px}
+  h1{font-size:18px;margin:0 0 12px}
+  h2{font-size:13px;opacity:.7;margin:20px 0 8px;text-transform:uppercase;letter-spacing:.08em}
+  button{background:#123a5c;color:#e9f2ff;border:1px solid #1f5f7a;border-radius:6px;padding:8px 12px;margin:3px;cursor:pointer}
+  button:hover{background:#1f5f7a}
+  label{display:inline-block;margin:4px 12px 4px 0}
+  input[type=range]{vertical-align:middle;width:160px}
+  .row{margin:6px 0}
+  #status{opacity:.7;font-family:monospace}
+  #pad{width:100%;height:200px;background:#050914;border:1px solid #1f5f7a;border-radius:8px;cursor:crosshair;position:relative;margin-top:8px}
+  #pad span{position:absolute;left:8px;top:6px;opacity:.5;font-size:12px}
+</style>
+</head>
+<body>
+<h1>Lago Quieto — teste de áudio</h1>
+<div class="row"><button id="init">init()</button> <span id="status">sem contexto</span></div>
+
+<h2>Parâmetros (opts)</h2>
+<div class="row">
+  <label>x <input type="range" id="x" min="0" max="1" step="0.01" value="0.5"> <span id="xv">0.50</span></label>
+  <label>y <input type="range" id="y" min="0" max="1" step="0.01" value="0.5"> <span id="yv">0.50</span></label>
+  <label>gain <input type="range" id="g" min="0" max="1.5" step="0.05" value="1"> <span id="gv">1.00</span></label>
+  <label>degree <input type="range" id="d" min="0" max="4" step="1" value="0"> <span id="dv">0</span></label>
+</div>
+<div id="pad"><span>clique aqui: plop + nota (x→nota, y→oitava). Arraste para spam (teste do teto de vozes).</span></div>
+
+<h2>Sons</h2>
+<div class="row" id="sounds"></div>
+
+<h2>Ambiente</h2>
+<div class="row">
+  <button data-amb="start">ambient.start()</button>
+  <button data-amb="stop">ambient.stop()</button>
+</div>
+<div class="row">
+  <label><input type="checkbox" id="moon"> moon</label>
+  <label><input type="checkbox" id="aurora"> aurora</label>
+  <label><input type="checkbox" id="fogOpen"> fogOpen (ramp 2 s aqui)</label>
+  <label><input type="checkbox" id="crickets" checked> crickets</label>
+  <label><input type="checkbox" id="rain"> rain (garoa)</label>
+  <label>wind <input type="range" id="wind" min="0" max="1" step="0.05" value="0"></label>
+</div>
+
+<h2>Master</h2>
+<div class="row">
+  <button id="mute">setMuted(true)</button>
+  <label>tema
+    <select id="theme">
+      <option>night</option><option>winter</option><option>autumn</option><option>ink</option><option>tropical</option>
+    </select>
+  </label>
+  <button id="cascade">cascata unlock (5 graus)</button>
+</div>
+
+<script src="audio.js"></script>
+<script>
+(function(){
+  var A = LQ.Audio;
+  var names = ['plop','note','pulse','firefly','fishJump','fishJumpGold','dew','frog','unlock','shooting','bloom','birds'];
+  var $ = function(id){ return document.getElementById(id); };
+  function opts(){ return { x:+$('x').value, y:+$('y').value, gain:+$('g').value, degree:+$('d').value }; }
+  function optsNoDeg(){ var o = opts(); delete o.degree; return o; }
+
+  ['x','y','g','d'].forEach(function(k){
+    $(k).addEventListener('input', function(){ $(k+'v').textContent = k==='d' ? this.value : (+this.value).toFixed(2); });
+  });
+
+  var box = $('sounds');
+  names.forEach(function(n){
+    var b = document.createElement('button'); b.textContent = n;
+    b.onclick = function(){ A.init(); var ok = A.play(n, n==='unlock' ? opts() : optsNoDeg()); log(n + ' → ' + ok); };
+    box.appendChild(b);
+  });
+
+  $('init').onclick = function(){ A.init(); log('init'); };
+
+  // pad: clique/arrasto = plop + nota
+  var pad = $('pad'), down = false;
+  function hit(e){
+    var r = pad.getBoundingClientRect();
+    var x = (e.clientX - r.left)/r.width, y = (e.clientY - r.top)/r.height;
+    A.init();
+    A.play('plop', {x:x, y:y});
+    var ok = A.play('note', {x:x, y:y, gain:+$('g').value});
+    log('plop + note(' + x.toFixed(2) + ',' + y.toFixed(2) + ') → ' + (ok ? 'nota' : 'só plop (<80 ms)'));
+  }
+  pad.addEventListener('pointerdown', function(e){ down = true; hit(e); });
+  pad.addEventListener('pointermove', function(e){ if (down) hit(e); });
+  window.addEventListener('pointerup', function(){ down = false; });
+
+  document.querySelectorAll('[data-amb]').forEach(function(b){
+    b.onclick = function(){ A.init(); A.ambient[b.dataset.amb](); log('ambient.' + b.dataset.amb); };
+  });
+  ['moon','aurora','crickets','rain'].forEach(function(k){
+    $(k).onchange = function(){ A.init(); var o = {}; o[k] = this.checked; A.ambient.set(o); log('ambient.set ' + JSON.stringify(o)); };
+  });
+  $('fogOpen').onchange = function(){ A.init(); A.ambient.set({fogOpen:this.checked, fogTime:2}); log('fogOpen ' + this.checked); };
+  $('wind').oninput = function(){ A.init(); A.ambient.set({wind:+this.value}); };
+
+  var muted = false;
+  $('mute').onclick = function(){ A.init(); muted = !muted; A.setMuted(muted); this.textContent = 'setMuted(' + !muted + ')'; };
+  $('theme').onchange = function(){ A.init(); A.setTheme(this.value); log('tema ' + this.value); };
+  $('cascade').onclick = function(){
+    A.init();
+    for (var i = 0; i < 5; i++) (function(i){ setTimeout(function(){ A.play('unlock', {degree:i, gain:1}); }, i*2500); })(i);
+    log('cascata: 5 acordes a cada 2,5 s');
+  };
+
+  var last = '';
+  function log(s){ last = s; }
+  setInterval(function(){
+    var c = A.context();
+    $('status').textContent = (c ? c.state + ' @' + c.sampleRate + 'Hz' : 'sem contexto') +
+      ' | vozes: ' + A.voicesActive() + '/8 | ambiente: ' + (A.ambient.running() ? 'on' : 'off') + (last ? ' | ' + last : '');
+  }, 100);
+})();
+</script>
+</body>
+</html>
