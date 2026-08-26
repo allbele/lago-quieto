@@ -61,7 +61,13 @@
     },
     onClick(x, y, game){
       if (!game.has('frog') || game.unlockFade('frog') < 0.5) return false;
-      if (Math.hypot(x - frog.x, y - frog.y) < 60){ jump(game); return true; }
+      if (Math.hypot(x - frog.x, y - frog.y) < 60){
+        const was = frog.jumping;
+        jump(game);
+        // pulo por clique = impacto (idle ganha moeda; zen ignora). Se já pulava, não conta.
+        if (!was && game.emit) game.emit('impact', { x: frog.x, y: frog.y, strength: 0.5, source: 'frog' });
+        return true;
+      }
       return false;
     },
     draw(layer, ctx, game){

@@ -3,19 +3,23 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 // cloudLoad é assíncrono no IPC, mas platform.js espera algo síncrono no boot.
-// Solução: buscamos o save da nuvem uma vez, cedo, e o entregamos via cache síncrono.
-let cloudCache = null;
+// Solução: buscamos cedo os arquivos conhecidos (zen e idle) e os entregamos via cache síncrono por nome.
+const FILES = ['save.json', 'save-idle.json'];
+const DEFAULT_FILE = FILES[0];
+const cloudCache = {};
 let cloudReady = false;
-const cloudPromise = ipcRenderer.invoke('steam:cloudLoad')
-  .then(v => { cloudCache = v || null; cloudReady = true; return cloudCache; })
-  .catch(() => { cloudReady = true; return null; });
+const fileOf = f => (typeof f === 'string' && f) ? f : DEFAULT_FILE;
+const cloudPromise = Promise.all(FILES.map(f => ipcRenderer.invoke('steam:cloudLoad', f)
+  .then(v => { cloudCache[f] = v || null; }).catch(() => { cloudCache[f] = null; })))
+  .then(() => { cloudReady = true; return cloudCache; });
 
 contextBridge.exposeInMainWorld('steamBridge', {
   achievement(id){ ipcRenderer.send('steam:achievement', String(id)); },
-  cloudSave(json){ ipcRenderer.send('steam:cloudSave', String(json)); },
-  // Síncrono: devolve o que já chegou da nuvem (ou null). Ver cloudLoadAsync para aguardar.
-  cloudLoad(){ return cloudCache; },
-  cloudLoadAsync(){ return cloudPromise; },
+  // cloudSave(json, file): file = 'save.json' (zen) | 'save-idle.json' (idle) — cada modo no seu arquivo
+  cloudSave(json, file){ ipcRenderer.send('steam:cloudSave', String(json), fileOf(file)); },
+  // Síncrono: devolve o que já chegou da nuvem para o arquivo (ou null). Ver cloudLoadAsync para aguardar.
+  cloudLoad(file){ return cloudCache[fileOf(file)] || null; },
+  cloudLoadAsync(file){ return cloudPromise.then(c => c[fileOf(file)] || null); },
   isCloudReady(){ return cloudReady; },
   info(){ return ipcRenderer.invoke('steam:info'); }
 });

@@ -53,8 +53,8 @@ function createWindow(){
 
 // ---------- IPC: ponte com o preload ----------
 ipcMain.on('steam:achievement', (_ev, id) => { steam.achievement(id); });
-ipcMain.on('steam:cloudSave', (_ev, json) => { steam.cloudSave(json); });
-ipcMain.handle('steam:cloudLoad', () => steam.cloudLoad());
+ipcMain.on('steam:cloudSave', (_ev, json, file) => { steam.cloudSave(json, file); }); // file: save.json | save-idle.json
+ipcMain.handle('steam:cloudLoad', (_ev, file) => steam.cloudLoad(file));
 ipcMain.handle('steam:info', () => steam.info());
 
 app.whenReady().then(() => {

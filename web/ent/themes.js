@@ -217,6 +217,43 @@ window.LQ = window.LQ || {};
   // Núcleo já dá: first_stone, woke_someone, clear_view, aurora, just_watching, accidental_melody, left_light_on, thousand_ripples.
   // golden_fish/night_bloom: ent/fish.js e ent/lilies.js; full_moon/until_dawn: ent/sky.js.
 
+  // ---------- Tinta (prestígio do idle) ----------
+  // O núcleo já tem game.setPaletteOverride({chave:'#hex'}|null): valores ABSOLUTOS aplicados
+  // por cima da paleta-alvo (depois de tema + fase do dia). LQ.themes.tint() fica por cima disso:
+  // recebe {color:'#hex', amount:0..1, keys?:[...]} (ou null) e calcula o override MISTURANDO a cor
+  // com a paleta noturna do tema atual — assim a tinta respeita o tema (papel do 'ink' fica claro,
+  // tropical fica verde-água etc.) e é recalculada a cada troca de tema (applyTheme).
+  // Limite: como o override é absoluto, durante a fase de dia (dawn) as chaves tingidas ficam na
+  // versão noturna; no idle 'dawn' só entra por forceUnlock, então é aceitável.
+  const BASE_NIGHT = { zenith: '#050914', horizon: '#0b1a33', shore: '#123a5c', ring: '#1f5f7a',
+    light: '#e9f2ff', firefly: '#d8f27a', gold: '#e8b04a', dark: '#0d2a1f',
+    auroraG: '#7ad3c9', auroraP: '#8a6bc9', dawn: '#f2b8a2', fog: '#ffffff' };
+  const TINT_KEYS = ['zenith', 'horizon', 'shore', 'ring'];
+  let tint = null; // {color, amount, keys}
+  function hexToRgb(h){ const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+  function mixHex(a, b, t){
+    const A = hexToRgb(a), B = hexToRgb(b);
+    return '#' + A.map((v, i) => Math.max(0, Math.min(255, Math.round(v + (B[i] - v) * t))).toString(16).padStart(2, '0')).join('');
+  }
+  function applyTint(game){
+    game = game || LQ.game;
+    if (!game || !game.setPaletteOverride) return;
+    if (!tint){ game.setPaletteOverride(null); return; }
+    const th = T[theme] || {};
+    const base = Object.assign({}, BASE_NIGHT, th.night || th);
+    const out = {};
+    for (const k of tint.keys) if (base[k]) out[k] = mixHex(base[k], tint.color, tint.amount);
+    game.setPaletteOverride(out);
+  }
+  // LQ.themes.tint(obj|null): obj = {color:'#hex', amount?:0.12, keys?:[...]}; null limpa.
+  T.tint = function(obj){
+    if (!obj || !obj.color){ tint = null; applyTint(); return; }
+    tint = { color: obj.color, amount: Math.max(0, Math.min(1, obj.amount == null ? 0.12 : obj.amount)),
+      keys: Array.isArray(obj.keys) && obj.keys.length ? obj.keys : TINT_KEYS };
+    applyTint();
+  };
+  T.currentTint = function(){ return tint; };
+
   // ---------- Troca de tema ----------
   function applyTheme(name, game){
     theme = LQ.themeList.indexOf(name) >= 0 ? name : 'night';
@@ -232,6 +269,7 @@ window.LQ = window.LQ || {};
     if (theme === 'autumn'){ for (const l of leaves) l.alive = false; for (let i = 0; i < 8; i++) spawnLeaf(game, true); }
     for (const s of strokes) s.active = false;
     for (const b of bio) b.active = false;
+    if (tint) applyTint(game); // tinta recalculada sobre o novo tema
   }
 
   LQ.register('themes', {

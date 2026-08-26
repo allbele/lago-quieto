@@ -95,6 +95,8 @@
             game.audio.play('pulse', { x: x / game.W, y: 0.4, gain: 1 });
           }
           game.spawnRipple(L.x, L.y + L.r * 0.5, { strength: 0.35, rings: 1 });
+          // impacto de clique (idle ganha moeda aqui; zen: nenhuma entidade escuta)
+          if (game.emit) game.emit('impact', { x: L.x, y: L.y, strength: 0.5, source: 'lily' });
           return true;
         }
       }
