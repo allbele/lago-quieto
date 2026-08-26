@@ -1,0 +1,2979 @@
+<title>Lago Quieto</title>
+
+
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+<style>
+/* Lago Quieto — reset e UI */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#050914;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+body.nocursor,body.nocursor *{cursor:none!important}
+
+#lake{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+
+/* Barra inferior */
+#ui{position:fixed;left:0;right:0;bottom:18px;display:flex;justify-content:center;gap:14px;
+  pointer-events:none;opacity:1;transition:opacity 1s ease}
+body.uihidden #ui{opacity:0}
+.ico{pointer-events:auto;width:40px;height:40px;border:0;background:transparent;padding:8px;cursor:pointer;
+  opacity:.6;transition:opacity .3s ease}
+.ico:hover,.ico:focus-visible{opacity:1;outline:none}
+:root{--ico:#e9f2ff}
+.ico svg{width:100%;height:100%;fill:none;stroke:var(--ico,#e9f2ff);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+body.uihidden .ico{pointer-events:none}
+
+/* Estado do ícone de som */
+#btn-sound .off{display:none}
+body.muted #btn-sound .on{display:none}
+body.muted #btn-sound .off{display:inline}
+body.eco #btn-eco{opacity:1}
+
+/* Coleção: faixa dos moradores acordados */
+#collection{position:fixed;left:0;right:0;bottom:70px;display:flex;justify-content:center;gap:16px;
+  pointer-events:none;opacity:0;transform:translateY(6px);transition:opacity .8s ease,transform .8s ease}
+#collection.open{opacity:1;transform:none}
+body.uihidden #collection{opacity:0}
+#collection svg{width:26px;height:26px;fill:none;stroke:var(--ico,#e9f2ff);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;opacity:.7}
+#collection svg.new{animation:born 4s ease forwards}
+@keyframes born{from{opacity:0;transform:translateY(4px)}to{opacity:.7;transform:none}}
+
+</style>
+
+
+<canvas id="lake"></canvas>
+
+<!-- Coleção: faixa com ícones dos moradores acordados (sem texto) -->
+<div id="collection" aria-hidden="true"></div>
+
+<!-- Barra inferior de ícones -->
+<div id="ui">
+  <button class="ico" id="btn-sound" data-act="sound">
+    <svg viewBox="0 0 24 24"><path d="M4 9.5v5h3.5l4.5 3.5V6L7.5 9.5H4z"/><path class="on" d="M15.5 9a4 4 0 0 1 0 6"/><path class="on" d="M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="off" d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
+  </button>
+  <button class="ico" id="btn-full" data-act="full">
+    <svg viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg>
+  </button>
+  <button class="ico" id="btn-theme" data-act="theme">
+    <svg viewBox="0 0 24 24"><path d="M12 3.5s-5.5 6-5.5 10a5.5 5.5 0 0 0 11 0c0-4-5.5-10-5.5-10z"/><path d="M9.5 14.5a2.5 2.5 0 0 0 2.5 2.5"/></svg>
+  </button>
+  <button class="ico" id="btn-coll" data-act="coll">
+    <svg viewBox="0 0 24 24"><path d="M15 3.5a9 9 0 1 0 5.5 14.5A8 8 0 0 1 15 3.5z"/></svg>
+  </button>
+  <button class="ico" id="btn-eco" data-act="eco">
+    <svg viewBox="0 0 24 24"><path d="M5 19c0-8 5-13 14-14 0 9-4.5 14-12 14"/><path d="M5 19c3-4 6-7 10-9"/></svg>
+  </button>
+</div>
+
+<!-- Ícones dos moradores (templates para a coleção) -->
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="ic-firefly" viewBox="0 0 24 24"><circle cx="12" cy="13" r="3.5"/><path d="M9.5 10.5L6 6M14.5 10.5L18 6"/></symbol>
+  <symbol id="ic-fish" viewBox="0 0 24 24"><path d="M4 12c3-4 7-5.5 11-4.5 2 .5 3.5 2.5 5 4.5-1.5 2-3 4-5 4.5-4 1-8-.5-11-4.5z"/><path d="M4 12l-1.5-3.5M4 12l-1.5 3.5"/></symbol>
+  <symbol id="ic-goldfish" viewBox="0 0 24 24"><path d="M4 12c3-4 7-5.5 11-4.5 2 .5 3.5 2.5 5 4.5-1.5 2-3 4-5 4.5-4 1-8-.5-11-4.5z"/><circle cx="16" cy="11" r=".8"/><path d="M11 8v8"/></symbol>
+  <symbol id="ic-moon" viewBox="0 0 24 24"><path d="M15 3.5a9 9 0 1 0 5.5 14.5A8 8 0 0 1 15 3.5z"/></symbol>
+  <symbol id="ic-mountain" viewBox="0 0 24 24"><path d="M2 19L9 7l4 6 2-3 7 9H2z"/></symbol>
+  <symbol id="ic-lily" viewBox="0 0 24 24"><path d="M12 6a8 4 0 1 0 0 .01"/><path d="M12 6v4"/></symbol>
+  <symbol id="ic-flower" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M12 4v4M12 16v4M4 12h4M16 12h4M6.5 6.5l3 3M14.5 14.5l3 3M17.5 6.5l-3 3M9.5 14.5l-3 3"/></symbol>
+  <symbol id="ic-shooting" viewBox="0 0 24 24"><path d="M3 17L15 8"/><path d="M17 4l1 2.5 2.5 1-2.5 1L17 11l-1-2.5-2.5-1 2.5-1z"/></symbol>
+  <symbol id="ic-frog" viewBox="0 0 24 24"><path d="M5 15c0-4 3-6 7-6s7 2 7 6-3 4-7 4-7 0-7-4z"/><circle cx="8.5" cy="9" r="2"/><circle cx="15.5" cy="9" r="2"/></symbol>
+  <symbol id="ic-aurora" viewBox="0 0 24 24"><path d="M3 9c3-3 6 3 9 0s6-3 9 0M3 15c3-3 6 3 9 0s6-3 9 0"/></symbol>
+  <symbol id="ic-bird" viewBox="0 0 24 24"><path d="M3 13c3-3 6-3 9 0 3-3 6-3 9 0"/><path d="M7 17c1.5-1.5 3.5-1.5 5 0 1.5-1.5 3.5-1.5 5 0"/></symbol>
+</svg>
+
+<script>
+/* Lago Quieto — áudio (WebAudio, tudo sintetizado). Não conhece o jogo. */
+(function () {
+  'use strict';
+  var LQ = window.LQ = window.LQ || {};
+
+  var MAX_VOICES = 8;      // teto de vozes simultâneas
+  var MIN_NOTE_GAP = 0.08; // 80 ms entre notas
+  var PENTA = [0, 2, 4, 7, 9]; // C D E G A (semitons)
+  var C4 = 261.6256;
+
+  var ctx = null;
+  var master, comp, dry, wet, conv, lowpass, themeShelf, themeHP, percBus;
+  var muted = false, theme = 'night', fogOpen = false;
+  var voices = [];
+  var lastNote = -1;
+  var amb = null; // nós do ambiente
+  var ambState = { moon: false, aurora: false, fogOpen: false, crickets: true, wind: 0, rain: false };
+
+  // ---------- utilitários ----------
+  function now() { return ctx ? ctx.currentTime : 0; }
+  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function cents(f, c) { return f * Math.pow(2, c / 1200); }
+
+  // nota pentatônica: degree 0..4 (+ oitavas por transbordo), oct 3|4
+  function freqOf(degree, oct) {
+    var d = Math.floor(degree);
+    var o = Math.floor(d / 5), k = ((d % 5) + 5) % 5;
+    return C4 * Math.pow(2, (oct - 4) + o + PENTA[k] / 12);
+  }
+  // x → grau, y → oitava (mais fundo = mais grave)
+  function noteFor(x, y) {
+    x = clamp(x == null ? 0.5 : x, 0, 0.999);
+    y = clamp(y == null ? 0.5 : y, 0, 1);
+    return freqOf(Math.floor(x * 5), y > 0.5 ? 3 : 4);
+  }
+
+  function panner(x) {
+    var p;
+    if (ctx.createStereoPanner) {
+      p = ctx.createStereoPanner();
+      p.pan.value = clamp(((x == null ? 0.5 : x) - 0.5) * 1.4, -1, 1);
+    } else {
+      p = ctx.createGain();
+    }
+    return p;
+  }
+
+  // ---------- pool de vozes ----------
+  function reap() {
+    var t = now();
+    for (var i = voices.length - 1; i >= 0; i--) if (voices[i].end <= t) voices.splice(i, 1);
+  }
+  function steal() {
+    var v = voices.shift(), t = now(); // mais antiga
+    try {
+      v.g.gain.cancelScheduledValues(t);
+      v.g.gain.setValueAtTime(v.g.gain.value, t);
+      v.g.gain.linearRampToValueAtTime(0, t + 0.03);
+      for (var i = 0; i < v.srcs.length; i++) try { v.srcs[i].stop(t + 0.04); } catch (e) {}
+    } catch (e) {}
+  }
+  // cria voz: gain → (pan) → destino. dur em segundos.
+  function mkVoice(dur, dest, x) {
+    reap();
+    while (voices.length >= MAX_VOICES) steal();
+    var g = ctx.createGain();
+    g.gain.value = 0;
+    var out = g;
+    if (x != null) { var p = panner(x); g.connect(p); out = p; }
+    out.connect(dest || master);
+    var v = { g: g, t0: now(), end: now() + dur, srcs: [] };
+    v.add = function (src, at) {
+      src.start(at == null ? v.t0 : at);
+      src.stop(v.end + 0.05);
+      v.srcs.push(src);
+      return src;
+    };
+    voices.push(v);
+    return v;
+  }
+  function osc(type, f, t) {
+    var o = ctx.createOscillator();
+    o.type = type;
+    o.frequency.setValueAtTime(f, t == null ? now() : t);
+    return o;
+  }
+
+  // ---------- buffers ----------
+  var noiseBuf = null, pinkBuf = null;
+  function whiteNoise() {
+    if (noiseBuf) return noiseBuf;
+    var n = ctx.sampleRate, b = ctx.createBuffer(1, n, ctx.sampleRate), d = b.getChannelData(0);
+    for (var i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    return (noiseBuf = b);
+  }
+  // branco por 3 lowpass em cascata (1-polo) → rosa aproximado
+  function pinkNoise() {
+    if (pinkBuf) return pinkBuf;
+    var n = ctx.sampleRate * 4, b = ctx.createBuffer(2, n, ctx.sampleRate);
+    for (var c = 0; c < 2; c++) {
+      var d = b.getChannelData(c), y1 = 0, y2 = 0, y3 = 0, a = 0.12, peak = 0;
+      for (var i = 0; i < n; i++) {
+        var w = Math.random() * 2 - 1;
+        y1 += a * (w - y1); y2 += a * (y1 - y2); y3 += a * (y2 - y3);
+        d[i] = y3; if (Math.abs(y3) > peak) peak = Math.abs(y3);
+      }
+      var k = peak > 0 ? 0.9 / peak : 1;
+      for (i = 0; i < n; i++) d[i] *= k;
+      // suaviza a costura do loop
+      var f = Math.min(2048, n >> 2);
+      for (i = 0; i < f; i++) { var m = i / f; d[i] *= m; d[n - 1 - i] *= m; }
+    }
+    return (pinkBuf = b);
+  }
+  // IR sintética: ruído branco × exp(−t/0.6), 2.5 s
+  function makeIR() {
+    var sr = ctx.sampleRate, n = Math.floor(sr * 2.5), b = ctx.createBuffer(2, n, sr);
+    for (var c = 0; c < 2; c++) {
+      var d = b.getChannelData(c);
+      for (var i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-(i / sr) / 0.6);
+    }
+    return b;
+  }
+  function weakCPU() {
+    var hc = navigator.hardwareConcurrency || 4, dm = navigator.deviceMemory || 4;
+    return hc <= 2 || dm <= 2;
+  }
+
+  // ---------- init ----------
+  function init() {
+    if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return true; }
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return false;
+    ctx = new AC();
+
+    master = ctx.createGain();
+    master.gain.value = muted ? 0 : 1;
+    comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -18; comp.ratio.value = 3;
+    comp.attack.value = 0.01; comp.release.value = 0.25; comp.knee.value = 6;
+    dry = ctx.createGain(); dry.gain.value = 0.6;
+    wet = ctx.createGain(); wet.gain.value = 0.4;
+    lowpass = ctx.createBiquadFilter();
+    lowpass.type = 'lowpass'; lowpass.frequency.value = fogOpen ? 6000 : 4000; lowpass.Q.value = 0.5;
+    themeShelf = ctx.createBiquadFilter(); themeShelf.type = 'highshelf'; themeShelf.frequency.value = 2500; themeShelf.gain.value = 0;
+    themeHP = ctx.createBiquadFilter(); themeHP.type = 'highpass'; themeHP.frequency.value = 20; themeHP.Q.value = 0.5;
+
+    master.connect(comp);
+    comp.connect(dry);
+    if (weakCPU()) {
+      // fallback: eco curto em vez de convolução
+      var dl = ctx.createDelay(1), fb = ctx.createGain(), dlp = ctx.createBiquadFilter();
+      dl.delayTime.value = 0.18; fb.gain.value = 0.35; dlp.type = 'lowpass'; dlp.frequency.value = 3000;
+      comp.connect(dl); dl.connect(dlp); dlp.connect(fb); fb.connect(dl); dlp.connect(wet);
+    } else {
+      conv = ctx.createConvolver(); conv.buffer = makeIR();
+      comp.connect(conv); conv.connect(wet);
+    }
+    dry.connect(lowpass); wet.connect(lowpass);
+    lowpass.connect(themeShelf); themeShelf.connect(themeHP); themeHP.connect(ctx.destination);
+
+    // barramento percussivo (plops) — permite abafar por tema
+    percBus = ctx.createBiquadFilter(); percBus.type = 'lowpass'; percBus.frequency.value = 20000; percBus.Q.value = 0.3;
+    percBus.connect(master);
+
+    setTheme(theme);
+    if (ambWanted) ambient.start();
+    return true;
+  }
+  function ready() { return !!ctx && ctx.state !== 'closed'; }
+
+  // ---------- sons ----------
+  // plop genérico: seno f0→f1 + burst de ruído
+  function plop(f0, f1, gain, x, at, noiseGain, noiseDur, noiseFreq) {
+    at = at == null ? now() : at;
+    var v = mkVoice((at - now()) + 0.3, percBus, x);
+    var o = osc('sine', f0, at);
+    o.frequency.exponentialRampToValueAtTime(f1, at + 0.12);
+    o.connect(v.g);
+    v.g.gain.setValueAtTime(0, at);
+    v.g.gain.linearRampToValueAtTime(gain, at + 0.005);
+    v.g.gain.exponentialRampToValueAtTime(0.0005, at + 0.185);
+    v.g.gain.linearRampToValueAtTime(0, at + 0.19);
+    v.add(o, at);
+    if (noiseGain > 0) {
+      var s = ctx.createBufferSource(); s.buffer = whiteNoise(); s.loop = true;
+      var bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = noiseFreq || 1200; bp.Q.value = 2;
+      var ng = ctx.createGain(); ng.gain.setValueAtTime(0, at);
+      ng.gain.linearRampToValueAtTime(noiseGain, at + 0.004);
+      ng.gain.linearRampToValueAtTime(0, at + (noiseDur || 0.04));
+      s.connect(bp); bp.connect(ng); ng.connect(v.g);
+      // ng já envelopa; v.g segue seu próprio envelope (multiplicativo, ok)
+      v.add(s, at);
+    }
+    return v;
+  }
+
+  // sino: fundamental + parcial 2.76× (decay 3× mais rápido) + triângulo oitava acima
+  function bell(f, gain, attack, release, x, at, dest) {
+    at = at == null ? now() : at;
+    var v = mkVoice((at - now()) + attack + release + 0.05, dest || master, x);
+    var det = rnd(-4, 4);
+    var g1 = ctx.createGain(), g2 = ctx.createGain(), g3 = ctx.createGain();
+    var o1 = osc('sine', cents(f, det), at);
+    var o2 = osc('sine', cents(f * 2.76, det), at);
+    var o3 = osc('triangle', cents(f * 2, det), at);
+    o1.connect(g1); o2.connect(g2); o3.connect(g3);
+    g1.connect(v.g); g2.connect(v.g); g3.connect(v.g);
+    g1.gain.value = 0.18; g3.gain.value = 0.05;
+    // parcial inarmônico decai 3× mais rápido
+    g2.gain.setValueAtTime(0.25 * 0.18, at);
+    g2.gain.setTargetAtTime(0, at + attack, release / 3 / 4);
+    v.g.gain.setValueAtTime(0, at);
+    v.g.gain.linearRampToValueAtTime(gain, at + attack);
+    v.g.gain.setTargetAtTime(0, at + attack, release / 4);
+    v.g.gain.linearRampToValueAtTime(0, at + attack + release);
+    v.add(o1, at); v.add(o2, at); v.add(o3, at);
+    return v;
+  }
+
+  // seno curto (tilintar / glissando)
+  function blip(f0, f1, dur, gain, x, at, type) {
+    at = at == null ? now() : at;
+    var v = mkVoice((at - now()) + dur + 0.05, master, x);
+    var o = osc(type || 'sine', f0, at);
+    if (f1 && f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, at + dur);
+    o.connect(v.g);
+    v.g.gain.setValueAtTime(0, at);
+    v.g.gain.linearRampToValueAtTime(gain, at + Math.min(0.01, dur * 0.2));
+    v.g.gain.linearRampToValueAtTime(0, at + dur);
+    v.add(o, at);
+    return v;
+  }
+
+  var sounds = {
+    // Plop da pedra: 220→90 Hz, ganho 0.5 + ruído 1.2 kHz
+    plop: function (o) { plop(220, 90, 0.5 * o.gain, o.x, null, 0.15, 0.04, 1200); return true; },
+
+    // Nota do anel (sino). Respeita 80 ms mínimo entre notas.
+    note: function (o) {
+      var t = now();
+      if (lastNote >= 0 && t - lastNote < MIN_NOTE_GAP) return false;
+      lastNote = t;
+      var f = o.degree != null ? freqOf(o.degree, o.y != null && o.y > 0.5 ? 3 : 4) : noteFor(o.x, o.y);
+      bell(f, 1.0 * o.gain, 0.03, 1.6, o.x);
+      return true;
+    },
+
+    // Pulso de morador: mesma nota, oitava acima, ganho 0.1
+    pulse: function (o) {
+      var f = (o.degree != null ? freqOf(o.degree, o.y != null && o.y > 0.5 ? 3 : 4) : noteFor(o.x, o.y)) * 2;
+      bell(f, 0.1 / 0.18 * o.gain, 0.03, 1.2, o.x);
+      return true;
+    },
+
+    // Vagalume acordado: 1.8–2.6 kHz, 60 ms, 0.04
+    firefly: function (o) { blip(rnd(1800, 2600), 0, 0.06, 0.04 * o.gain, o.x); return true; },
+
+    // Peixe: 2 plops 440→180 a 90 ms + ruído 80 ms
+    fishJump: function (o) {
+      var t = now();
+      plop(440, 180, 0.22 * o.gain, o.x, t, 0.08, 0.08, 1600);
+      plop(440, 180, 0.18 * o.gain, o.x, t + 0.09, 0, 0, 0);
+      return true;
+    },
+    // Dourado: + sino em A4
+    fishJumpGold: function (o) {
+      sounds.fishJump(o);
+      bell(440, 0.6 * o.gain, 0.02, 1.8, o.x, now() + 0.1);
+      return true;
+    },
+
+    // Gota de orvalho: 330→140 Hz, 0.2
+    dew: function (o) { plop(330, 140, 0.2 * o.gain, o.x, null, 0.05, 0.03, 2000); return true; },
+
+    // Sapo: quadrada 90 Hz, LFO 14 Hz, 300 ms, lowpass 400, 0.08
+    frog: function (o) {
+      var t = now(), v = mkVoice(0.35, master, o.x);
+      var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 400; lp.Q.value = 1;
+      var am = ctx.createGain(); am.gain.value = 0.5;
+      var sq = osc('square', 90, t);
+      var lfo = osc('sine', 14, t), lg = ctx.createGain(); lg.gain.value = 0.5;
+      lfo.connect(lg); lg.connect(am.gain);
+      sq.connect(am); am.connect(lp); lp.connect(v.g);
+      v.g.gain.setValueAtTime(0, t);
+      v.g.gain.linearRampToValueAtTime(0.08 * o.gain, t + 0.03);
+      v.g.gain.setValueAtTime(0.08 * o.gain, t + 0.24);
+      v.g.gain.linearRampToValueAtTime(0, t + 0.3);
+      v.add(sq, t); v.add(lfo, t);
+      return true;
+    },
+
+    // Desbloqueio: acorde de 3 notas (grau, +2, +4), ataque 400 ms, release 3 s, 0.12
+    unlock: function (o) {
+      var d = o.degree == null ? 0 : Math.floor(o.degree);
+      var t = now();
+      var v = mkVoice(3.6, master, o.x);
+      var det = rnd(-4, 4);
+      for (var i = 0; i < 3; i++) {
+        var f = freqOf(d + i * 2, 4);
+        var g1 = ctx.createGain(), g2 = ctx.createGain(), g3 = ctx.createGain();
+        g1.gain.value = 0.18; g3.gain.value = 0.05;
+        g2.gain.setValueAtTime(0.045, t); g2.gain.setTargetAtTime(0, t + 0.4, 0.25);
+        var o1 = osc('sine', cents(f, det), t), o2 = osc('sine', cents(f * 2.76, det), t), o3 = osc('triangle', cents(f * 2, det), t);
+        o1.connect(g1); o2.connect(g2); o3.connect(g3);
+        g1.connect(v.g); g2.connect(v.g); g3.connect(v.g);
+        v.add(o1, t); v.add(o2, t); v.add(o3, t);
+      }
+      v.g.gain.setValueAtTime(0, t);
+      v.g.gain.linearRampToValueAtTime(0.22 * o.gain, t + 0.4); // ~0.12 efetivo (3 notas × 0.18)
+      v.g.gain.setTargetAtTime(0, t + 0.4, 0.75);
+      v.g.gain.linearRampToValueAtTime(0, t + 3.4);
+      return true;
+    },
+
+    // Estrela cadente: 2 kHz→600 Hz, 400 ms, 0.03
+    shooting: function (o) { blip(2000, 600, 0.4, 0.03 * o.gain, o.x); return true; },
+
+    // Flor: nota longa 2.4 s com detune
+    bloom: function (o) {
+      var f = (o.degree != null ? freqOf(o.degree, 4) : noteFor(o.x, 0)) ;
+      var t = now(), v = mkVoice(2.6, master, o.x);
+      var a = osc('sine', cents(f, -7), t), b = osc('sine', cents(f, 7), t), c = osc('triangle', cents(f * 2, 0), t);
+      var gc = ctx.createGain(); gc.gain.value = 0.15;
+      a.connect(v.g); b.connect(v.g); c.connect(gc); gc.connect(v.g);
+      v.g.gain.setValueAtTime(0, t);
+      v.g.gain.linearRampToValueAtTime(0.09 * o.gain, t + 0.5);
+      v.g.gain.setValueAtTime(0.09 * o.gain, t + 1.2);
+      v.g.gain.linearRampToValueAtTime(0, t + 2.4);
+      v.add(a, t); v.add(b, t); v.add(c, t);
+      return true;
+    },
+
+    // Pássaros: 3 sinos curtos agudos
+    birds: function (o) {
+      var t = now(), base = [9, 11, 14][Math.floor(Math.random() * 3)]; // graus altos
+      for (var i = 0; i < 3; i++) {
+        bell(freqOf(base + [0, 2, 1][i], 5), 0.25 * o.gain, 0.008, 0.35, clamp((o.x == null ? 0.5 : o.x) + rnd(-0.15, 0.15), 0, 1), t + i * 0.16);
+      }
+      return true;
+    }
+  };
+
+  function play(name, opts) {
+    if (!ready()) return false;
+    if (ctx.state === 'suspended') ctx.resume();
+    var fn = sounds[name];
+    if (!fn) return false;
+    var o = opts || {};
+    o = { x: o.x, y: o.y, gain: o.gain == null ? 1 : o.gain, degree: o.degree };
+    try { return fn(o); } catch (e) { return false; }
+  }
+
+  // ---------- ambiente ----------
+  var ambWanted = false;
+  var cricketTimer = null;
+
+  function scheduleCricket() {
+    if (!amb || !ambState.crickets) return;
+    cricketTimer = setTimeout(function () {
+      if (!amb || !ambState.crickets) return;
+      try {
+        var t = now(), p = panner(Math.random());
+        var g = ctx.createGain(), o = osc('sine', 4200, t);
+        o.connect(g); g.connect(p); p.connect(amb.bus);
+        g.gain.setValueAtTime(0, t);
+        for (var i = 0; i < 8; i++) { // 8 pulsos a 30 Hz
+          var tp = t + i / 30;
+          g.gain.setValueAtTime(0, tp);
+          g.gain.linearRampToValueAtTime(0.02, tp + 0.004);
+          g.gain.linearRampToValueAtTime(0, tp + 0.02);
+        }
+        o.start(t); o.stop(t + 0.3);
+      } catch (e) {}
+      scheduleCricket();
+    }, rnd(3000, 7000));
+  }
+
+  function applyAmb(time) {
+    if (!amb) return;
+    var t = now(), tc = time == null ? 2 : time;
+    amb.moon.gain.cancelScheduledValues(t);
+    amb.moon.gain.setTargetAtTime(ambState.moon ? 0.015 : 0, t, tc);
+    amb.aurora.gain.cancelScheduledValues(t);
+    amb.aurora.gain.setTargetAtTime(ambState.aurora ? 0.012 : 0, t, Math.max(tc, 8)); // muito lento
+    var w = clamp(ambState.wind || 0, 0, 1);
+    amb.noiseGain.gain.setTargetAtTime(0.03 + w * 0.012, t, 1);
+    amb.lfoDepth.gain.setTargetAtTime(0.006 + w * 0.02, t, 1);
+    amb.rain.gain.cancelScheduledValues(t);
+    amb.rain.gain.setTargetAtTime(ambState.rain ? 0.02 : 0, t, 1.5);
+    if (ambState.crickets && !cricketTimer) scheduleCricket();
+    if (!ambState.crickets && cricketTimer) { clearTimeout(cricketTimer); cricketTimer = null; }
+  }
+
+  var ambient = {
+    start: function () {
+      ambWanted = true;
+      if (!ready() || amb) return;
+      var t = now();
+      var bus = ctx.createGain(); bus.gain.value = 0;
+      bus.connect(master);
+      bus.gain.linearRampToValueAtTime(1, t + 2);
+
+      // ruído rosa → lowpass 500 → ganho 0.03 × LFO 0.1 Hz
+      var src = ctx.createBufferSource(); src.buffer = pinkNoise(); src.loop = true;
+      var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 500;
+      var ng = ctx.createGain(); ng.gain.value = 0.03;
+      var lfo = osc('sine', 0.1, t), ld = ctx.createGain(); ld.gain.value = 0.006;
+      lfo.connect(ld); ld.connect(ng.gain);
+      src.connect(lp); lp.connect(ng); ng.connect(bus);
+      src.start(t); lfo.start(t);
+
+      // drone 55 + 82.4 (+110 lua, +164.8 aurora)
+      function drone(f, g0) {
+        var o = osc('sine', f, t), g = ctx.createGain(); g.gain.value = g0;
+        o.connect(g); g.connect(bus); o.start(t); return g;
+      }
+      var d1 = drone(55, 0.02), d2 = drone(82.4, 0.02), moon = drone(110, 0), aurora = drone(164.8, 0);
+
+      // garoa: ruído bandpass 3 kHz, ganho 0.02 (opcional)
+      var rs = ctx.createBufferSource(); rs.buffer = whiteNoise(); rs.loop = true;
+      var rbp = ctx.createBiquadFilter(); rbp.type = 'bandpass'; rbp.frequency.value = 3000; rbp.Q.value = 0.8;
+      var rg = ctx.createGain(); rg.gain.value = 0;
+      rs.connect(rbp); rbp.connect(rg); rg.connect(bus); rs.start(t);
+
+      amb = { bus: bus, src: src, lfo: lfo, noiseGain: ng, lfoDepth: ld, d1: d1, d2: d2, moon: moon, aurora: aurora, rain: rg, rs: rs };
+      applyAmb(0.5);
+    },
+    stop: function () {
+      ambWanted = false;
+      if (!amb) return;
+      var a = amb, t = now(); amb = null;
+      if (cricketTimer) { clearTimeout(cricketTimer); cricketTimer = null; }
+      a.bus.gain.cancelScheduledValues(t);
+      a.bus.gain.setValueAtTime(a.bus.gain.value, t);
+      a.bus.gain.linearRampToValueAtTime(0, t + 1.5);
+      setTimeout(function () {
+        try { a.src.stop(); a.lfo.stop(); a.rs.stop(); a.bus.disconnect(); } catch (e) {}
+      }, 1700);
+    },
+    // set({moon, aurora, fogOpen, crickets, wind, rain, fogTime})
+    set: function (o) {
+      o = o || {};
+      if (o.moon != null) ambState.moon = !!o.moon;
+      if (o.aurora != null) ambState.aurora = !!o.aurora;
+      if (o.crickets != null) ambState.crickets = !!o.crickets;
+      if (o.wind != null) ambState.wind = clamp(+o.wind || 0, 0, 1);
+      if (o.rain != null) ambState.rain = !!o.rain;
+      if (o.fogOpen != null) setFog(!!o.fogOpen, o.fogTime);
+      applyAmb();
+    },
+    running: function () { return !!amb; }
+  };
+
+  // lowpass master: 4 kHz com névoa → 6 kHz sem (60 s por padrão)
+  function setFog(open, secs) {
+    // só reage a mudança de estado (chamadas periódicas não reiniciam a rampa)
+    if (open === fogOpen && ready()) return;
+    fogOpen = open; ambState.fogOpen = open;
+    if (!ready()) return;
+    var t = now(), d = secs == null ? 60 : Math.max(0.05, secs);
+    lowpass.frequency.cancelScheduledValues(t);
+    lowpass.frequency.setValueAtTime(lowpass.frequency.value, t);
+    lowpass.frequency.linearRampToValueAtTime(open ? 6000 : 4000, t + d);
+  }
+
+  // ---------- controles ----------
+  function setMuted(m) {
+    muted = !!m;
+    if (!ready()) return;
+    var t = now();
+    master.gain.cancelScheduledValues(t);
+    master.gain.setValueAtTime(master.gain.value, t);
+    master.gain.linearRampToValueAtTime(muted ? 0 : 1, t + 0.3); // fade 300 ms, nunca corte
+  }
+
+  // temas: só ajustam filtros
+  function setTheme(name) {
+    theme = name || 'night';
+    if (!ready()) return;
+    var t = now(), perc = 20000, shelf = 0, hp = 20;
+    if (theme === 'winter') { perc = 2000; shelf = -2; }        // plop abafado
+    else if (theme === 'autumn') { shelf = -4; hp = 40; }       // mais quente
+    else if (theme === 'ink') { shelf = -6; hp = 120; }         // seco, mínimo
+    else if (theme === 'tropical') { shelf = 2.5; hp = 30; }    // mais claro
+    percBus.frequency.setTargetAtTime(perc, t, 0.2);
+    themeShelf.gain.setTargetAtTime(shelf, t, 0.3);
+    themeHP.frequency.setTargetAtTime(hp, t, 0.3);
+  }
+
+  function voicesActive() { if (!ctx) return 0; reap(); return voices.length; }
+
+  LQ.Audio = {
+    init: init,
+    play: play,
+    ambient: ambient,
+    setMuted: setMuted,
+    setTheme: setTheme,
+    voicesActive: voicesActive,
+    noteFor: noteFor,
+    freqOf: freqOf,
+    isMuted: function () { return muted; },
+    ready: ready,
+    context: function () { return ctx; }
+  };
+})();
+
+</script>
+<script>
+// Camada fina de plataforma. Browser: no-op + localStorage. Steam: troca a implementação abaixo.
+// O jogo nunca sabe onde roda — só fala com LQ.Platform.
+window.LQ = window.LQ || {};
+LQ.Platform = (function(){
+  const KEY = 'lagoquieto';
+  const ACH_KEY = 'lagoquieto.ach'; // espelho local dos achievements (útil para depurar e para merge)
+
+  // TODO(steam): na build Electron/Steamworks, expor `window.steamworks` (steamworks.js) antes deste script:
+  //   const sw = require('steamworks.js'); const client = sw.init(APP_ID); window.steamworks = client;
+  // Então: achievement(id) → client.achievement.activate(STEAM_IDS[id]);
+  //        saveCloud(json) → client.cloud.writeFile('save.json', json);
+  //        loadCloud()     → client.cloud.fileExists('save.json') ? client.cloud.readFile('save.json') : null;
+  //        overlay do troféu → client.overlay.activateToWebPage / activate('Achievements').
+  const steam = (typeof window !== 'undefined' && window.steamworks) ? window.steamworks : null;
+
+  // Ids internos (§8) → API names configurados no Steamworks (ajustar ao painel do parceiro).
+  const STEAM_IDS = {
+    first_stone: 'ACH_FIRST_STONE', woke_someone: 'ACH_WOKE_SOMEONE', full_moon: 'ACH_FULL_MOON',
+    clear_view: 'ACH_CLEAR_VIEW', golden_fish: 'ACH_GOLDEN_FISH', night_bloom: 'ACH_NIGHT_BLOOM',
+    aurora: 'ACH_AURORA', until_dawn: 'ACH_UNTIL_DAWN', just_watching: 'ACH_JUST_WATCHING',
+    accidental_melody: 'ACH_ACCIDENTAL_MELODY', left_light_on: 'ACH_LEFT_LIGHT_ON', thousand_ripples: 'ACH_THOUSAND_RIPPLES'
+  };
+
+  function localAch(){ try { return JSON.parse(localStorage.getItem(ACH_KEY) || '[]'); } catch (e) { return []; } }
+
+  // Merge de saves (§8): max(totalTime, ripples) e união de unlocked/achievements.
+  function merge(a, b){
+    if (!a) return b; if (!b) return a;
+    const out = Object.assign({}, a.totalTime >= b.totalTime ? a : b);
+    out.totalTime = Math.max(a.totalTime || 0, b.totalTime || 0);
+    out.ripples = Math.max(a.ripples || 0, b.ripples || 0);
+    out.liliesBloomed = Math.max(a.liliesBloomed || 0, b.liliesBloomed || 0);
+    const uni = (x, y) => Array.from(new Set([].concat(x || [], y || [])));
+    out.unlocked = uni(a.unlocked, b.unlocked);
+    out.achievements = uni(a.achievements, b.achievements);
+    out.lastSeen = Math.max(a.lastSeen || 0, b.lastSeen || 0);
+    return out;
+  }
+
+  return {
+    name: steam ? 'steam' : 'web',
+    wallpaper: false, // modo papel de parede (Steam): 15 fps — a build Steam liga isto
+    isSteam(){ return !!steam; },
+    achievement(id){
+      // browser: só espelha em localStorage (sem UI, sem texto)
+      try {
+        const l = localAch();
+        if (l.indexOf(id) < 0){ l.push(id); localStorage.setItem(ACH_KEY, JSON.stringify(l)); }
+      } catch (e) {}
+      if (steam){
+        // TODO(steam): steam.achievement.activate(STEAM_IDS[id] || id)
+        try { steam.achievement && steam.achievement.activate(STEAM_IDS[id] || id); } catch (e) {}
+      }
+    },
+    saveCloud(json){
+      try { localStorage.setItem(KEY, json); } catch (e) {}
+      if (steam){
+        // TODO(steam): steam.cloud.writeFile('save.json', json)
+        try { steam.cloud && steam.cloud.writeFile('save.json', json); } catch (e) {}
+      }
+    },
+    loadCloud(){
+      let local = null, cloud = null;
+      try { local = localStorage.getItem(KEY); } catch (e) {}
+      if (steam){
+        // TODO(steam): cloud = steam.cloud.fileExists('save.json') ? steam.cloud.readFile('save.json') : null
+        try { cloud = steam.cloud && steam.cloud.fileExists('save.json') ? steam.cloud.readFile('save.json') : null; } catch (e) {}
+      }
+      if (!cloud) return local;
+      try {
+        const m = merge(local ? JSON.parse(local) : null, JSON.parse(cloud));
+        return JSON.stringify(m);
+      } catch (e) { return local; }
+    },
+    merge,
+    STEAM_IDS
+  };
+})();
+
+</script>
+<script>
+// Lago Quieto — núcleo (estado, unlocks, cena, anéis, gotas, input, UI, loop).
+window.LQ = window.LQ || {};
+(function(){
+  'use strict';
+  const LQ = window.LQ;
+
+  // ---------- Registro de entidades ----------
+  const ents = [];
+  LQ.register = function(name, def){
+    const i = ents.findIndex(e => e.name === name);
+    const e = { name, def };
+    if (i >= 0) ents[i] = e; else ents.push(e);
+  };
+  function call(hook, a, b, c){
+    for (let i = 0; i < ents.length; i++){
+      const f = ents[i].def[hook];
+      if (f) f.call(ents[i].def, a, b, c);
+    }
+  }
+
+  // ---------- Utilidades ----------
+  const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const ease = {
+    smoothstep: t => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); },
+    easeInQuad: t => t * t,
+    easeOutQuad: t => 1 - (1 - t) * (1 - t)
+  };
+  function hexToRgb(h){
+    const n = parseInt(h.slice(1), 16);
+    return [n >> 16 & 255, n >> 8 & 255, n & 255];
+  }
+  function rgbToHex(r){
+    return '#' + r.map(v => clamp(Math.round(v), 0, 255).toString(16).padStart(2, '0')).join('');
+  }
+  function lerpHex(a, b, t){
+    const A = hexToRgb(a), B = hexToRgb(b);
+    return rgbToHex([lerp(A[0], B[0], t), lerp(A[1], B[1], t), lerp(A[2], B[2], t)]);
+  }
+  // PRNG simples e determinístico (semente por sessão)
+  let seed = (Date.now() & 0xffff) | 1;
+  function rand(){ seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+
+  // ---------- Paletas ----------
+  const NIGHT = {
+    zenith: '#050914', horizon: '#0b1a33', shore: '#123a5c', ring: '#1f5f7a',
+    light: '#e9f2ff', firefly: '#d8f27a', gold: '#e8b04a', dark: '#0d2a1f',
+    auroraG: '#7ad3c9', auroraP: '#8a6bc9', dawn: '#f2b8a2', fog: '#ffffff'
+  };
+  const DAY = {
+    zenith: '#4a6f9a', horizon: '#9fb9d6', shore: '#3f7a96', ring: '#5f9fb8',
+    light: '#f8fbff', firefly: '#d8f27a', gold: '#e8b04a', dark: '#1a3a2c',
+    auroraG: '#7ad3c9', auroraP: '#8a6bc9', dawn: '#f2b8a2', fog: '#ffffff'
+  };
+  LQ.themes = LQ.themes || {}; // ent/themes.js pode preencher: nome → sobrescritas de paleta
+  const THEME_LIST = ['night', 'winter', 'autumn', 'ink', 'tropical'];
+
+  // ---------- Tabela de desbloqueios (§3) ----------
+  const UNLOCKS = [
+    { id: 'fireflies',  time: 45,    ripples: 8,    fade: 5, icon: 'firefly',  ach: 'woke_someone' },
+    { id: 'wind',       time: 90,    ripples: 20,   fade: 6 },
+    { id: 'fish',       time: 150,   ripples: 30,   fade: 5, icon: 'fish' },
+    { id: 'stars2',     time: 180,   ripples: 40,   fade: 8 },
+    { id: 'moon',       time: 360,   ripples: 70,   fade: 8, icon: 'moon' },
+    { id: 'fireflies2', time: 600,   ripples: 120,  fade: 6 },
+    { id: 'fish2',      time: 900,   ripples: 180,  fade: 6, icon: 'goldfish' },
+    { id: 'fog_clear',  time: 1200,  ripples: 250,  fade: 8, icon: 'mountain', ach: 'clear_view' },
+    { id: 'lilies',     time: 1800,  ripples: 350,  fade: 6, icon: 'lily' },
+    { id: 'sky_alive',  time: 2700,  ripples: 500,  fade: 8, icon: 'shooting' },
+    { id: 'frog',       time: 3600,  ripples: 700,  fade: 6, icon: 'frog' },
+    { id: 'aurora',     time: 7200,  ripples: 1200, fade: 8, icon: 'aurora',   ach: 'aurora' },
+    { id: 'dawn',       time: 14400, ripples: Infinity, fade: 8, icon: 'bird' }
+  ];
+  const fadeStart = {};   // id → game.t em que o fade começou
+  let pending = [];       // fila de desbloqueios (cascata)
+  let cascadeTimer = 0, cascadeDegree = 0;
+
+  // ---------- Estado salvo (§7) ----------
+  const SAVE_KEY = 'lagoquieto';
+  const OFFLINE_CAP = 8 * 3600;
+  function fresh(){
+    return { v: 1, ripples: 0, totalTime: 0, lastSeen: 0, unlocked: [],
+      liliesBloomed: 0, theme: 'night', muted: false, eco: false,
+      achievements: [], stats: { longestIdle: 0, asc: 0 }, dawnAt: -1 };
+  }
+  function migrate(s){
+    if (!s || typeof s !== 'object' || Array.isArray(s)) return fresh();
+    const f = fresh();
+    for (const k in f) if (s[k] === undefined) s[k] = f[k];
+    // coage tipos (save corrompido nunca vira string/NaN)
+    s.ripples = Math.max(0, Math.floor(Number(s.ripples) || 0));
+    s.totalTime = Math.max(0, Number(s.totalTime) || 0);
+    s.lastSeen = Math.max(0, Number(s.lastSeen) || 0);
+    s.liliesBloomed = Math.max(0, Math.floor(Number(s.liliesBloomed) || 0));
+    s.dawnAt = Number.isFinite(+s.dawnAt) ? +s.dawnAt : -1;
+    s.muted = s.muted === true; s.eco = s.eco === true;
+    if (!s.stats || typeof s.stats !== 'object') s.stats = f.stats;
+    s.stats.longestIdle = Number(s.stats.longestIdle) || 0;
+    s.stats.asc = Number(s.stats.asc) || 0;
+    const ids = UNLOCKS.map(u => u.id);
+    s.unlocked = Array.isArray(s.unlocked) ? s.unlocked.filter(x => ids.indexOf(x) >= 0) : [];
+    s.achievements = Array.isArray(s.achievements) ? s.achievements.filter(x => typeof x === 'string' && /^[a-z_]{1,32}$/.test(x)) : [];
+    if (THEME_LIST.indexOf(s.theme) < 0) s.theme = 'night';
+    s.v = 1;
+    return s;
+  }
+  function load(){
+    let raw = null;
+    try { raw = LQ.Platform && LQ.Platform.loadCloud ? LQ.Platform.loadCloud() : localStorage.getItem(SAVE_KEY); } catch (e) {}
+    try { return migrate(raw ? JSON.parse(raw) : null); } catch (e) { return fresh(); }
+  }
+  let resetting = false;
+  function save(){
+    if (resetting) return;
+    const s = game.state;
+    // aba oculta: credita a ausência até agora (sem contar duas vezes)
+    if (hiddenAt){ s.totalTime += Math.min((Date.now() - hiddenAt) / 1000, OFFLINE_CAP); hiddenAt = Date.now(); }
+    s.lastSeen = Date.now();
+    const json = JSON.stringify(s);
+    if (LQ.Platform && LQ.Platform.saveCloud) LQ.Platform.saveCloud(json);
+    else try { localStorage.setItem(SAVE_KEY, json); } catch (e) {}
+  }
+
+  // ---------- Objeto game (API para entidades) ----------
+  const audioStub = {
+    init(){}, play(){}, setMuted(){}, setTheme(){}, voicesActive(){ return 0; },
+    ambient: { start(){}, stop(){}, set(){} }
+  };
+  const game = {
+    W: 1, H: 1, horizonY: 1, t: 0, dpr: 1,
+    state: null, calm: 0, palette: Object.assign({}, NIGHT), eco: false,
+    mouse: { x: -1, y: -1, idleFor: 0, overWater: false },
+    moonX: 0, moonY: 0, moonR: 0, // ent/sky.js preenche
+    dayPhase: 0, dawnPink: 0,
+    paletteVersion: 0,          // incrementa a cada mudança de game.palette
+    lilyCount: 0,               // ent/lilies.js preenche
+    lightBlend: 'lighter',      // ent/themes.js troca para 'multiply' em tema claro
+    rand, ease,
+    setPaletteOverride(obj){ paletteOverride = obj || null; },
+    has(id){ return this.state.unlocked.indexOf(id) >= 0; },
+    unlockFade(id){
+      if (!this.has(id)) return 0;
+      const u = UNLOCKS.find(x => x.id === id);
+      const s = fadeStart[id];
+      if (s === undefined) return 1;
+      return ease.smoothstep((this.t - s) / (u ? u.fade : 6));
+    },
+    spawnRipple, spawnDrops,
+    sprite: { glow: glowSprite },
+    audio: audioStub, platform: null,
+    achievement(id){
+      const s = this.state;
+      if (s.achievements.indexOf(id) >= 0) return;
+      s.achievements.push(id);
+      if (this.platform && this.platform.achievement) this.platform.achievement(id);
+    },
+    sinceClick: 20, // começa em modo ambiente (§3, fase 0)
+    noteGain(){ return this.calm > 14 ? 0.5 : 1; }
+  };
+  LQ.game = game;
+
+  // ---------- Sprites de glow cacheados ----------
+  const glowCache = {};
+  function glowSprite(color, radius){
+    const key = color + '|' + radius;
+    let c = glowCache[key];
+    if (c) return c;
+    const r = Math.max(2, Math.ceil(radius));
+    c = document.createElement('canvas');
+    c.width = c.height = r * 2;
+    const g = c.getContext('2d');
+    const grad = g.createRadialGradient(r, r, 0, r, r, r);
+    grad.addColorStop(0, color);
+    grad.addColorStop(0.35, color + 'aa');
+    grad.addColorStop(1, color + '00');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, r * 2, r * 2);
+    glowCache[key] = c;
+    return c;
+  }
+
+  // ---------- Cena: canvas e offscreens ----------
+  let canvas, ctx, skyCv, waterCv, fogCv, started = false;
+  let paletteDirty = true, palTimer = 0;
+
+  function resize(){
+    game.eco = !!game.state.eco;
+    const dpr = clamp(window.devicePixelRatio || 1, 1, game.eco ? 1 : 1.5);
+    game.dpr = dpr;
+    game.W = window.innerWidth; game.H = window.innerHeight;
+    game.horizonY = Math.round(game.H * 0.40);
+    canvas.width = Math.round(game.W * dpr); canvas.height = Math.round(game.H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    paletteDirty = true;
+    for (const k in glowCache) delete glowCache[k];
+    if (started) call('onResize', game);
+  }
+
+  function rebuildOffscreens(){
+    const P = game.palette, W = game.W, H = game.H, hy = game.horizonY;
+    if (!skyCv){ skyCv = document.createElement('canvas'); waterCv = document.createElement('canvas'); fogCv = document.createElement('canvas'); }
+    // Céu: gradiente vertical zênite → horizonte (+ rosa do amanhecer)
+    skyCv.width = W; skyCv.height = hy;
+    let g = skyCv.getContext('2d');
+    let grad = g.createLinearGradient(0, 0, 0, hy);
+    grad.addColorStop(0, P.zenith);
+    grad.addColorStop(0.7, lerpHex(P.zenith, P.horizon, 0.7));
+    grad.addColorStop(1, lerpHex(P.horizon, P.dawn, game.dawnPink * 0.5));
+    g.fillStyle = grad; g.fillRect(0, 0, W, hy);
+    // Água: horizonte (profundo) → margem
+    waterCv.width = W; waterCv.height = H - hy;
+    g = waterCv.getContext('2d');
+    grad = g.createLinearGradient(0, 0, 0, H - hy);
+    grad.addColorStop(0, lerpHex(P.horizon, P.dawn, game.dawnPink * 0.25));
+    grad.addColorStop(0.35, P.horizon);
+    grad.addColorStop(1, P.shore);
+    g.fillStyle = grad; g.fillRect(0, 0, W, H - hy);
+    // Névoa baixa: faixa com gradiente cacheado (ent/fog.js anima alpha/offset)
+    fogCv.width = W + 40; fogCv.height = Math.round(H * 0.22);
+    g = fogCv.getContext('2d');
+    grad = g.createLinearGradient(0, 0, 0, fogCv.height);
+    grad.addColorStop(0, P.fog + '00');
+    grad.addColorStop(0.5, P.fog + '70'); // pico suave: névoa fina, não faixa
+    grad.addColorStop(1, P.fog + '00');
+    g.fillStyle = grad; g.fillRect(0, 0, fogCv.width, fogCv.height);
+    game.fogSprite = fogCv;
+    paletteDirty = false;
+  }
+
+  // Paleta-alvo: tema + fase do dia; lerp a cada 500 ms
+  function targetPalette(){
+    const th = LQ.themes[game.state.theme] || {};
+    const base = Object.assign({}, NIGHT, th.night || th);
+    const day = Object.assign({}, DAY, th.day || {});
+    const out = {};
+    for (const k in base) out[k] = lerpHex(base[k], day[k], game.dayPhase);
+    // lua nascida: 10% mais azul/clara (§3 #5)
+    const mk = game.unlockFade('moon') * 0.10;
+    if (mk > 0){
+      out.zenith = lerpHex(out.zenith, '#0b1a33', mk);
+      out.horizon = lerpHex(out.horizon, out.light, mk * 0.5);
+      out.shore = lerpHex(out.shore, out.light, mk * 0.5);
+    }
+    if (game.dawnPink > 0) out.horizon = lerpHex(out.horizon, out.dawn, game.dawnPink * 0.4);
+    if (paletteOverride) for (const k in paletteOverride) if (out[k] !== undefined) out[k] = paletteOverride[k];
+    return out;
+  }
+  function updateDayCycle(){
+    const s = game.state;
+    if (!game.has('dawn')){ game.dayPhase = 0; game.dawnPink = 0; return; }
+    let ph;
+    const since = s.totalTime - s.dawnAt; // primeiro ciclo: 30 min sobe, 30 min dia, 30 min desce
+    if (s.dawnAt >= 0 && since < 5400){
+      ph = since < 1800 ? since / 1800 : since < 3600 ? 1 : 1 - (since - 3600) / 1800;
+    } else {
+      const h = new Date().getHours() + new Date().getMinutes() / 60; // relógio real
+      ph = h < 5 ? 0 : h < 7 ? (h - 5) / 2 : h < 17 ? 1 : h < 20 ? 1 - (h - 17) / 3 : 0;
+    }
+    ph = ease.smoothstep(ph);
+    game.dayPhase = ph;
+    game.dawnPink = Math.sin(Math.PI * ph); // rosa só nas transições
+  }
+  let paletteOverride = null; // game.setPaletteOverride({chave:'#hex'}|null): aplicado ao alvo
+  function stepPalette(){
+    const T = targetPalette();
+    let changed = false;
+    for (const k in T){
+      const cur = game.palette[k] || T[k];
+      const A = hexToRgb(cur), B = hexToRgb(T[k]);
+      // snap final: perto do alvo salta direto (o lerp arredondado nunca converge)
+      const near = Math.abs(A[0] - B[0]) <= 2 && Math.abs(A[1] - B[1]) <= 2 && Math.abs(A[2] - B[2]) <= 2;
+      const nv = near ? T[k] : lerpHex(cur, T[k], 0.25);
+      if (nv !== game.palette[k]){ game.palette[k] = nv; changed = true; }
+    }
+    if (changed){
+      paletteDirty = true; game.paletteVersion++;
+      for (const k in glowCache) delete glowCache[k]; // sprites dependem da cor; evita cache crescer
+    }
+  }
+
+  // ---------- Anéis (pool 40) ----------
+  const RIPPLE_MAX = 40, RING_LIFE = 1.8, RING_SPEED = 60;
+  const ripples = [];
+  for (let i = 0; i < RIPPLE_MAX; i++) ripples.push({ active: false, x: 0, y: 0, age: 0, strength: 1, rings: 3 });
+  let rippleCursor = 0;
+  function spawnRipple(x, y, opts){
+    opts = opts || {};
+    // recicla o mais antigo se o pool estiver cheio
+    let r = null;
+    for (let i = 0; i < RIPPLE_MAX; i++){ const c = ripples[(rippleCursor + i) % RIPPLE_MAX]; if (!c.active){ r = c; break; } }
+    if (!r){ r = ripples[rippleCursor]; }
+    rippleCursor = (rippleCursor + 1) % RIPPLE_MAX;
+    r.active = true; r.x = x; r.y = y; r.age = 0;
+    r.strength = opts.strength !== undefined ? opts.strength : 1;
+    r.rings = clamp(Math.round(opts.rings !== undefined ? opts.rings : (r.strength < 0.5 ? 1 : r.strength < 0.8 ? 2 : 3)) || 1, 1, 3);
+    activeRipples++;
+    call('onRipple', x, y, game);
+    return r;
+  }
+  const RING_DELAY = [0, 0.12, 0.24], RING_A0 = [1, 0.6, 0.35];
+  let activeRipples = 0;
+  function updateRipples(dt){
+    activeRipples = 0;
+    for (let i = 0; i < RIPPLE_MAX; i++){
+      const r = ripples[i]; if (!r.active) continue;
+      r.age += dt;
+      if (r.age > RING_LIFE + RING_DELAY[r.rings - 1]) r.active = false; else activeRipples++;
+    }
+  }
+  function drawRipples(){
+    if (game.hideCoreRipples) return; // tema substitui os anéis (ex.: pinceladas da tinta)
+    ctx.strokeStyle = game.palette.ring; ctx.lineWidth = 1.5;
+    for (let i = 0; i < RIPPLE_MAX; i++){
+      const r = ripples[i]; if (!r.active) continue;
+      for (let k = 0; k < r.rings; k++){
+        const a = r.age - RING_DELAY[k]; if (a <= 0 || a >= RING_LIFE) continue;
+        const f = 1 - a / RING_LIFE;
+        const alpha = RING_A0[k] * f * f * (0.5 + 0.5 * r.strength);
+        if (alpha < 0.01) continue;
+        const rad = a * RING_SPEED * (0.6 + 0.4 * r.strength);
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        ctx.ellipse(r.x, r.y, rad, rad * 0.35, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  // Deslocamento x da água num ponto por causa dos anéis (usado no reflexo da lua)
+  function rippleOffset(px, py){
+    let off = 0;
+    if (!activeRipples) return 0;
+    for (let i = 0; i < RIPPLE_MAX; i++){
+      const r = ripples[i]; if (!r.active) continue;
+      const dx = px - r.x, dy = (py - r.y) / 0.35;
+      const front = r.age * RING_SPEED, lim = front + 30;
+      const d2 = dx * dx + dy * dy;
+      if (d2 > lim * lim) continue; // sai antes do sqrt
+      const d = Math.sqrt(d2);
+      const life = 1 - r.age / (RING_LIFE + 0.24);
+      off += Math.sin(d * 0.3 - r.age * 6) * 3 * r.strength * life;
+    }
+    return off;
+  }
+  game.rippleOffset = rippleOffset;
+
+  // ---------- Gotas (pool 60) ----------
+  const DROP_MAX = 60, drops = [];
+  for (let i = 0; i < DROP_MAX; i++) drops.push({ active: false, x: 0, y: 0, vx: 0, vy: 0, age: 0, color: null });
+  let dropCursor = 0;
+  function spawnDrops(x, y, n, color){
+    for (let k = 0; k < n; k++){
+      const d = drops[dropCursor]; dropCursor = (dropCursor + 1) % DROP_MAX;
+      d.color = color || null;
+      const ang = rand() * Math.PI * 2, sp = 40 + rand() * 50;
+      d.active = true; d.x = x; d.y = y; d.age = 0;
+      d.vx = Math.cos(ang) * sp * 0.6; d.vy = -Math.abs(Math.sin(ang)) * sp - 30;
+    }
+  }
+  function updateDrops(dt){
+    for (let i = 0; i < DROP_MAX; i++){
+      const d = drops[i]; if (!d.active) continue;
+      d.age += dt; if (d.age >= 0.5){ d.active = false; continue; }
+      d.vy += 300 * dt; d.x += d.vx * dt; d.y += d.vy * dt;
+    }
+  }
+  function drawDrops(){
+    ctx.fillStyle = game.palette.light;
+    for (let i = 0; i < DROP_MAX; i++){
+      const d = drops[i]; if (!d.active) continue;
+      ctx.fillStyle = d.color || game.palette.light;
+      ctx.globalAlpha = (1 - d.age / 0.5) * 0.9;
+      ctx.fillRect(d.x - 1, d.y - 1, 2, 2);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------- Pedras caindo e brilhos do céu ----------
+  const stones = [], glows = [];
+  const STONE_T = 0.25;
+  function throwStone(x, y){
+    stones.push({ x, y, age: 0 });
+  }
+  let lastNoteAt = -1, ascRun = 0, lastDegree = -1;
+  function impact(x, y){
+    const s = game.state;
+    spawnRipple(x, y, { strength: 1, rings: 3 });
+    spawnDrops(x, y, 3 + Math.floor(rand() * 4));
+    s.ripples++;
+    game.calm = Math.min(20, game.calm + 1);
+    // Áudio: plop + nota (x → nota, y → oitava); nota só se >80 ms desde a anterior
+    const nx = clamp(x / game.W, 0, 1), ny = clamp((y - game.horizonY) / (game.H - game.horizonY), 0, 1);
+    // gain é relativo (1 = valor de projeto do §6; audio.js aplica os absolutos)
+    game.audio.play('plop', { x: nx, y: ny, gain: 1 });
+    const now = performance.now();
+    if (now - lastNoteAt >= 80){
+      game.audio.play('note', { x: nx, y: ny, gain: game.noteGain() });
+      lastNoteAt = now;
+      const deg = Math.min(4, Math.floor(nx * 5)); // "Melodia Acidental": 5 notas ascendentes
+      ascRun = deg > lastDegree ? ascRun + 1 : 1; lastDegree = deg;
+      if (ascRun >= 5) game.achievement('accidental_melody');
+    }
+    if (s.ripples === 1) game.achievement('first_stone');
+    if (s.ripples >= 1000) game.achievement('thousand_ripples');
+  }
+  function updateStones(dt){
+    for (let i = stones.length - 1; i >= 0; i--){
+      const st = stones[i]; st.age += dt;
+      if (st.age >= STONE_T){
+        stones.splice(i, 1);
+        if (st.dew){
+          // gota de orvalho: anel menor, sem contar ripple
+          spawnRipple(st.x, st.y, { strength: 0.55, rings: 2 });
+          spawnDrops(st.x, st.y, 2);
+          game.audio.play('dew', { x: st.x / game.W, y: 0.5, gain: 1 });
+        } else impact(st.x, st.y);
+      }
+    }
+    for (let i = glows.length - 1; i >= 0; i--){ glows[i].age += dt; if (glows[i].age >= 0.3) glows.splice(i, 1); }
+  }
+  function drawStones(){
+    ctx.fillStyle = game.palette.light;
+    for (const st of stones){
+      const k = ease.easeInQuad(st.age / STONE_T);
+      // pedra: arco leve; orvalho: cai reto da altura do junco
+      const h = st.dew ? st.fallH : 40;
+      const y = st.y - h * (1 - k), x = st.x - (st.dew ? 0 : 8) * (1 - k);
+      ctx.globalAlpha = st.dew ? 0.6 : 0.9;
+      ctx.beginPath(); ctx.arc(x, y, st.dew ? 1.5 : 2, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+  function drawGlows(){
+    for (const g of glows){
+      const k = 1 - g.age / 0.3;
+      const sp = glowSprite(game.palette.light, 40);
+      ctx.globalAlpha = 0.12 * Math.sin(Math.PI * (1 - k));
+      ctx.drawImage(sp, g.x - 40, g.y - 40, 80, 80);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------- Reflexo da lua em fatias ----------
+  function drawMoonReflection(){
+    if (game.moonR <= 0 || game.moonY > game.horizonY) return;
+    const P = game.palette, hy = game.horizonY;
+    const len = Math.min(game.H - hy, game.moonR * 14);
+    const baseW = game.moonR * 2.2 + 40; // ~80 px
+    ctx.fillStyle = P.light;
+    if (game.eco){
+      // eco: um único retângulo esmaecido
+      ctx.globalAlpha = 0.05;
+      ctx.fillRect(game.moonX - baseW * 0.5, hy, baseW, len);
+      ctx.globalAlpha = 1; return;
+    }
+    const slice = 3, n = Math.floor(len / slice);
+    const t = game.t;
+    for (let i = 0; i < n; i++){
+      const y = hy + i * slice, f = 1 - i / n;
+      const w = baseW * (0.35 + 0.65 * (1 - f)) * (0.9 + 0.1 * Math.sin(y * 0.11 + t * 1.3));
+      const dx = Math.sin(y * 0.15 + t * 2) * 2 + rippleOffset(game.moonX, y);
+      ctx.globalAlpha = 0.10 * f * f + 0.008;
+      ctx.fillRect(game.moonX + dx - w * 0.5, y, w, slice);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------- Halo do cursor ----------
+  function drawCursorHalo(){
+    const m = game.mouse;
+    if (!m.overWater || m.idleFor > 120 || m.x < 0) return;
+    const boost = game.sinceClick < 0.3 ? 0.2 : 0;
+    const a = 0.06 + boost;
+    ctx.fillStyle = game.palette.light;
+    for (let k = 3; k >= 1; k--){
+      ctx.globalAlpha = a * (4 - k) / 3;
+      ctx.beginPath(); ctx.ellipse(m.x, m.y, 7 * k, 7 * k * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------- Desbloqueios ----------
+  function checkUnlocks(){
+    const s = game.state;
+    for (const u of UNLOCKS){
+      if (s.unlocked.indexOf(u.id) >= 0 || pending.indexOf(u.id) >= 0) continue;
+      if (s.totalTime >= u.time || s.ripples >= u.ripples) pending.push(u.id);
+    }
+  }
+  function applyUnlock(id){
+    const s = game.state, u = UNLOCKS.find(x => x.id === id);
+    s.unlocked.push(id);
+    fadeStart[id] = game.t;
+    if (id === 'dawn' && s.dawnAt < 0) s.dawnAt = s.totalTime;
+    game.audio.play('unlock', { degree: cascadeDegree % 5, gain: 1 });
+    cascadeDegree++;
+    if (u && u.ach) game.achievement(u.ach);
+    call('onUnlock', id, game);
+    updateAmbient();
+    UI.refreshCollection(u && u.icon);
+  }
+  function updatePending(dt){
+    if (!pending.length){ cascadeTimer = 0; cascadeDegree = 0; return; }
+    cascadeTimer -= dt;
+    if (cascadeTimer <= 0){
+      applyUnlock(pending.shift());
+      cascadeTimer = 2.5; // cascata de boas-vindas
+    }
+  }
+  function updateAmbient(){
+    game.audio.ambient.set({
+      moon: game.has('moon'), aurora: game.has('aurora'), fogOpen: game.has('fog_clear'),
+      crickets: game.dayPhase < 0.5, wind: game.has('wind') ? 1 : 0
+    });
+  }
+
+  // ---------- Modo ambiente ----------
+  let dewTimer = 8, watchTimer = 0;
+  function updateAmbientMode(dt){
+    if (game.sinceClick < 0.001) watchTimer = 0; // houve clique neste frame
+    watchTimer += dt;
+    game.sinceClick += dt;
+    if (game.sinceClick < 20){ dewTimer = 6 + rand() * 4; return; }
+    dewTimer -= dt;
+    if (dewTimer <= 0){
+      dewTimer = 6 + rand() * 4;
+      // gota cai de um junco (70%) ou de um ponto qualquer da água
+      const per = (LQ.reeds && LQ.reeds.perches) ? LQ.reeds.perches(game) : [];
+      let x, y, fallH = 40;
+      if (per.length && rand() < 0.7){
+        const p = per[Math.floor(rand() * per.length)];
+        x = clamp(p.x + (rand() - 0.5) * 10, 10, game.W - 10);
+        y = clamp(p.y + 40 + rand() * 80, game.horizonY + 20, game.H - 20);
+        fallH = Math.max(20, y - p.y);
+      } else {
+        x = 40 + rand() * (game.W - 80);
+        y = game.horizonY + 20 + rand() * (game.H - game.horizonY - 60);
+      }
+      stones.push({ x, y, age: 0, dew: true, fallH });
+    }
+    // "Só Olhando": 10 min sem clicar
+    if (watchTimer >= 600) game.achievement('just_watching');
+    if (game.sinceClick > game.state.stats.longestIdle) game.state.stats.longestIdle = Math.floor(game.sinceClick);
+  }
+
+  // ---------- Input ----------
+  function canvasPos(e){
+    const r = canvas.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+  let audioStarted = false;
+  function ensureAudio(){
+    if (audioStarted) return;
+    audioStarted = true;
+    game.audio.init();
+    game.audio.setMuted(!!game.state.muted);
+    game.audio.setTheme(game.state.theme);
+    // névoa já dissipada em sessão anterior: lowpass já aberto (sem rampa de 60 s)
+    game.audio.ambient.set({ fogOpen: game.has('fog_clear'), fogTime: 0.05 });
+    game.audio.ambient.start();
+    updateAmbient();
+  }
+  function onPointerDown(e){
+    if (e.button !== undefined && e.button !== 0) return;
+    ensureAudio();
+    const p = canvasPos(e);
+    game.mouse.x = p.x; game.mouse.y = p.y; game.mouse.idleFor = 0;
+    UI.wake();
+    // Primeiro os moradores
+    for (let i = ents.length - 1; i >= 0; i--){
+      const f = ents[i].def.onClick;
+      if (f && f.call(ents[i].def, p.x, p.y, game)){ game.sinceClick = 0; return; }
+    }
+    if (p.y > game.horizonY){ throwStone(p.x, p.y); game.sinceClick = 0; }
+    else glows.push({ x: p.x, y: p.y, age: 0 }); // brilho sutil, nunca erro
+  }
+  function onPointerMove(e){
+    const p = canvasPos(e);
+    game.mouse.x = p.x; game.mouse.y = p.y; game.mouse.idleFor = 0;
+    game.mouse.overWater = p.y > game.horizonY;
+    UI.wake();
+  }
+  function onPointerLeave(){ game.mouse.overWater = false; }
+
+  // ---------- UI ----------
+  const UI = {
+    hideTimer: 0, collOpen: false, hover: false,
+    init(){
+      const ui = document.getElementById('ui');
+      ui.addEventListener('pointerdown', e => e.stopPropagation());
+      // ponteiro parado sobre a barra: ela não some debaixo do cursor
+      ui.addEventListener('pointerenter', () => { UI.hover = true; UI.wake(); });
+      ui.addEventListener('pointerleave', () => { UI.hover = false; UI.hideTimer = 0; });
+      document.querySelectorAll('.ico').forEach(b => {
+        b.addEventListener('click', e => { e.stopPropagation(); UI.act(b.dataset.act); });
+      });
+      UI.applyClasses();
+      UI.refreshCollection(null, true);
+    },
+    act(a){
+      const s = game.state;
+      ensureAudio();
+      if (a === 'sound'){ s.muted = !s.muted; game.audio.setMuted(s.muted); }
+      else if (a === 'full'){
+        let p = null;
+        if (document.fullscreenElement){ if (document.exitFullscreen) p = document.exitFullscreen(); }
+        else if (document.documentElement.requestFullscreen) p = document.documentElement.requestFullscreen();
+        if (p && p.catch) p.catch(() => {}); // sem gesto/permissão: silencioso
+      }
+      else if (a === 'theme'){
+        const list = LQ.themeList || THEME_LIST;
+        s.theme = list[(list.indexOf(s.theme) + 1) % list.length];
+        game.audio.setTheme(s.theme);
+        call('onTheme', s.theme, game);
+      }
+      else if (a === 'coll'){ UI.collOpen = !UI.collOpen; document.getElementById('collection').classList.toggle('open', UI.collOpen); }
+      else if (a === 'eco'){ s.eco = !s.eco; resize(); }
+      UI.applyClasses(); save();
+    },
+    applyClasses(){
+      const b = document.body, s = game.state;
+      b.classList.toggle('muted', !!s.muted);
+      b.classList.toggle('eco', !!s.eco);
+    },
+    wake(){ UI.hideTimer = 0; document.body.classList.remove('uihidden'); },
+    update(dt){
+      game.mouse.idleFor += dt;
+      if (UI.hover) UI.hideTimer = 0; else UI.hideTimer += dt;
+      if (UI.hideTimer > 3) document.body.classList.add('uihidden');
+      document.body.classList.toggle('nocursor', game.mouse.idleFor > 120);
+    },
+    // Coleção: um ícone por morador acordado; `newIcon` nasce com fade
+    refreshCollection(newIcon, silent){
+      const el = document.getElementById('collection');
+      const s = game.state, icons = [];
+      for (const u of UNLOCKS) if (u.icon && s.unlocked.indexOf(u.id) >= 0) icons.push(u.icon);
+      if (s.liliesBloomed > 0) icons.push('flower');
+      let html = '';
+      for (const ic of icons){
+        html += '<svg class="' + (ic === newIcon && !silent ? 'new' : '') + '"><use href="#ic-' + ic + '"/></svg>';
+      }
+      el.innerHTML = html;
+      // morador novo: a faixa aparece sozinha por alguns segundos (fade, sem texto)
+      if (newIcon && !silent && !UI.collOpen){
+        el.classList.add('open');
+        clearTimeout(UI.peekTimer);
+        UI.peekTimer = setTimeout(() => { if (!UI.collOpen) el.classList.remove('open'); }, 6000);
+      }
+    }
+  };
+  game.ui = UI;
+  // Recomeçar do zero (dev/teste): impede o save de unload regravar o estado e recarrega
+  LQ.reset = function(){
+    resetting = true;
+    try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+    location.reload();
+  };
+
+  // ---------- Desenho por camadas ----------
+  // 'reeds' vem depois de 'water' (juncos ficam na margem, em primeiro plano)
+  const LAYERS = ['sky', 'aurora', 'moon', 'mountains', 'water', 'reeds', 'lilies', 'fish', 'ripples', 'light', 'fog'];
+  function draw(){
+    if (paletteDirty) rebuildOffscreens();
+    const W = game.W, H = game.H, hy = game.horizonY;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(skyCv, 0, 0);
+    for (const layer of LAYERS){
+      if (layer === 'aurora'){ if (game.eco) continue; ctx.globalCompositeOperation = 'screen'; }
+      else if (layer === 'light') ctx.globalCompositeOperation = game.lightBlend || 'lighter'; // tema claro (tinta): multiply
+      else ctx.globalCompositeOperation = 'source-over';
+      if (layer === 'water'){ ctx.drawImage(waterCv, 0, hy); }
+      call('draw', layer, ctx, game);
+      if (layer === 'water') drawMoonReflection();
+      if (layer === 'ripples'){ drawRipples(); drawStones(); }
+      if (layer === 'light'){ drawDrops(); drawGlows(); drawCursorHalo(); }
+      ctx.globalAlpha = 1;
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // ---------- Loop ----------
+  let last = 0, saveTimer = 0, unlockTimer = 0, hiddenAt = 0, running = false;
+  function frame(now){
+    if (!running) return;
+    requestAnimationFrame(frame);
+    if (LQ.Platform && LQ.Platform.wallpaper && now - last < 66) return; // papel de parede: 15 fps
+    let dt = (now - last) / 1000; last = now;
+    if (dt > 0.05) dt = 0.05; if (dt < 0) dt = 0;
+    game.t += dt;
+    game.state.totalTime += dt;
+    game.calm = Math.max(0, game.calm - 0.2 * dt);
+
+    palTimer += dt;
+    if (palTimer >= 0.5){ palTimer = 0; updateDayCycle(); stepPalette(); }
+    unlockTimer += dt;
+    if (unlockTimer >= 1){ unlockTimer = 0; checkUnlocks(); updateAmbient(); }
+    updatePending(dt);
+    updateAmbientMode(dt);
+    updateStones(dt);
+    updateRipples(dt);
+    updateDrops(dt);
+    call('update', dt, game);
+    UI.update(dt);
+    draw();
+
+    saveTimer += dt;
+    if (saveTimer >= 10){ saveTimer = 0; save(); }
+  }
+  function onVisibility(){
+    if (document.hidden){
+      running = false; hiddenAt = Date.now(); save();
+    } else {
+      // Volta: avança relógio (cap 8 h) e deixa a cascata mostrar o que acordou
+      if (hiddenAt){ game.state.totalTime += Math.min((Date.now() - hiddenAt) / 1000, OFFLINE_CAP); hiddenAt = 0; }
+      checkUnlocks();
+      if (running) return; // já há um encadeamento de rAF
+      running = true; last = performance.now(); requestAnimationFrame(frame);
+    }
+  }
+
+  // ---------- Início ----------
+  LQ.start = function(){
+    game.state = load();
+    game.platform = LQ.Platform || null;
+    game.audio = LQ.Audio || audioStub;
+    // Ganho offline (cap 8 h) + achievement de retorno após 24 h+
+    const s = game.state, now = Date.now();
+    if (s.lastSeen > 0){
+      const away = (now - s.lastSeen) / 1000;
+      s.totalTime += Math.min(Math.max(0, away), OFFLINE_CAP);
+      if (away >= 86400) game.achievement('left_light_on');
+    }
+    canvas = document.getElementById('lake');
+    ctx = canvas.getContext('2d', { alpha: false });
+    resize();
+    updateDayCycle();
+    game.palette = targetPalette(); paletteDirty = true;
+
+    call('init', game);
+    started = true;
+    UI.init();
+    checkUnlocks(); // pendentes entram em cascata (2,5 s cada)
+    cascadeTimer = pending.length > 1 ? 1.5 : 0;
+
+    window.addEventListener('resize', resize);
+    canvas.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerleave', onPointerLeave);
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('beforeunload', save);
+    window.addEventListener('pagehide', save);
+
+    running = true; last = performance.now();
+    requestAnimationFrame(frame);
+  };
+})();
+
+</script>
+<script>
+// Juncos — silhuetas na margem (3 à esquerda desde o início, mais à direita com 'fireflies2').
+// Path2D cacheado por junco; respiração 1.0→1.03→1.0 em 400 ms quando um anel nasce a <120 px;
+// balanço ±3° (seno) com o unlock 'wind'. Expõe LQ.reeds.perches() para os vagalumes pousarem.
+window.LQ = window.LQ || {};
+(function(){
+  'use strict';
+  const LQ = window.LQ;
+  const BREATH_T = 0.4, BREATH_R = 120, MAX_ANGLE = 3 * Math.PI / 180;
+  const reeds = [];       // {side, nx, h, lean, path, tipX, tipY, phase, breath, angle, wx, wy}
+  let lastW = 0, lastH = 0;
+
+  // Constrói a Path2D de um junco em coordenadas locais (base na origem, y para cima é negativo)
+  function buildPath(r, game){
+    const H = game.H;
+    const h = r.h * H, lean = r.lean * H;
+    const p = new Path2D();
+    // Caule: curva fina afunilando até a ponta
+    const w0 = 3.2, tx = lean, ty = -h;
+    p.moveTo(-w0 * 0.5, 0);
+    p.quadraticCurveTo(lean * 0.35 - 1, -h * 0.55, tx - 0.6, ty);
+    p.lineTo(tx + 0.6, ty);
+    p.quadraticCurveTo(lean * 0.35 + 1, -h * 0.55, w0 * 0.5, 0);
+    p.closePath();
+    // Espiga (tipo taboa) em alguns juncos
+    if (r.head){
+      p.ellipse(tx, ty + h * 0.06, 2.6, h * 0.07, r.lean * 0.6, 0, Math.PI * 2);
+    }
+    // Uma ou duas folhas saindo do caule
+    for (let i = 0; i < r.leaves; i++){
+      const f = 0.25 + i * 0.28;                  // altura relativa da folha
+      const sx = lean * f * 0.5, sy = -h * f;
+      const dir = (i % 2 === 0 ? -1 : 1) * r.side;
+      const lx = sx + dir * h * 0.16, ly = sy - h * 0.22;
+      p.moveTo(sx, sy);
+      p.quadraticCurveTo(sx + dir * h * 0.04, sy - h * 0.14, lx, ly);
+      p.quadraticCurveTo(sx + dir * h * 0.09, sy - h * 0.08, sx + dir * 2, sy + 4);
+      p.closePath();
+    }
+    r.path = p; r.tipX = tx; r.tipY = ty;
+  }
+
+  function makeReed(side, nx, rnd){
+    return {
+      side, nx,
+      h: 0.16 + rnd() * 0.14,           // altura relativa a H
+      lean: (rnd() * 0.06 + 0.02) * (rnd() < 0.5 ? -1 : 1),
+      head: rnd() < 0.6, leaves: 1 + Math.floor(rnd() * 2),
+      phase: rnd() * Math.PI * 2, speed: 0.6 + rnd() * 0.5,
+      breath: 10, angle: 0, path: null, tipX: 0, tipY: 0, wx: 0, wy: 0
+    };
+  }
+
+  function rebuild(game){
+    for (const r of reeds) buildPath(r, game);
+    lastW = game.W; lastH = game.H;
+  }
+
+  function baseY(game){ return game.H + 2; }   // base um pouco abaixo da borda inferior
+  function baseX(r, game){ return r.nx * game.W; }
+
+  const def = {
+    init(game){
+      const rnd = game.rand;
+      reeds.length = 0;
+      // 3 à esquerda (sempre)
+      reeds.push(makeReed('L', 0.045, rnd), makeReed('L', 0.085, rnd), makeReed('L', 0.125, rnd));
+      // 4 à direita (fade com 'fireflies2')
+      reeds.push(makeReed('R', 0.905, rnd), makeReed('R', 0.935, rnd), makeReed('R', 0.965, rnd), makeReed('R', 0.985, rnd));
+      for (const r of reeds){ r.side = r.side === 'L' ? -1 : 1; }
+      rebuild(game);
+    },
+
+    onResize(game){ rebuild(game); },
+    update(dt, game){
+      if (game.W !== lastW || game.H !== lastH) rebuild(game);
+      const wind = game.has('wind') ? game.unlockFade('wind') : 0;
+      const by = baseY(game);
+      for (const r of reeds){
+        r.breath += dt;
+        // Balanço: soma de dois senos lentos, amplitude ±3°
+        const s = Math.sin(game.t * r.speed + r.phase) * 0.75 + Math.sin(game.t * r.speed * 2.3 + r.phase * 1.7) * 0.25;
+        r.angle = MAX_ANGLE * s * wind;
+        // Ponta em coordenadas de tela (para os vagalumes pousarem)
+        const c = Math.cos(r.angle), sn = Math.sin(r.angle);
+        r.wx = baseX(r, game) + r.tipX * c - r.tipY * sn;
+        r.wy = by + r.tipX * sn + r.tipY * c;
+      }
+    },
+
+    // Camada 'reeds' (depois da água): primeiro plano da margem
+    draw(layer, ctx, game){
+      if (layer !== 'reeds') return;
+      const rightFade = game.has('fireflies2') ? game.unlockFade('fireflies2') : 0;
+      const by = baseY(game);
+      ctx.fillStyle = game.palette.dark;
+      for (const r of reeds){
+        const a = r.side < 0 ? 1 : rightFade;
+        if (a <= 0.005) continue;
+        let sc = 1;
+        if (r.breath < BREATH_T) sc = 1 + 0.03 * Math.sin(Math.PI * r.breath / BREATH_T);
+        ctx.globalAlpha = a;
+        ctx.save();
+        ctx.translate(baseX(r, game), by);
+        ctx.rotate(r.angle);
+        if (sc !== 1) ctx.scale(sc, sc);
+        ctx.fill(r.path);
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+    },
+
+    // Anel perto da base → respiração
+    onRipple(x, y, game){
+      const by = baseY(game);
+      for (const r of reeds){
+        if (r.side > 0 && !game.has('fireflies2')) continue;
+        // distância ao segmento base→ponta (não só à base, que fica fora da tela)
+        const bx = baseX(r, game), vx = r.wx - bx, vy = r.wy - by;
+        const len2 = vx * vx + vy * vy || 1;
+        const t = Math.max(0, Math.min(1, ((x - bx) * vx + (y - by) * vy) / len2));
+        const dx = x - (bx + vx * t), dy = y - (by + vy * t);
+        if (dx * dx + dy * dy < BREATH_R * BREATH_R) r.breath = 0;
+      }
+    }
+  };
+
+  LQ.register('reeds', def);
+
+  // API para outras entidades (vagalumes): pontas dos juncos visíveis
+  LQ.reeds = {
+    perches(game){
+      const out = [];
+      const right = game.has('fireflies2');
+      for (const r of reeds){
+        if (r.side > 0 && !right) continue;
+        out.push({ x: r.wx, y: r.wy, reed: r });
+      }
+      return out;
+    }
+  };
+})();
+
+</script>
+<script>
+// Vagalumes — 5 com 'fireflies', 15 com 'fireflies2'. Movimento = soma de 2 senos, pulso 2-4 s.
+// Glow via game.sprite.glow na camada 'light'. Fogem 30 px do anel (ease 600 ms) e brilham 2 s
+// com tilintar; clique = pulso + nota uma oitava acima. Alguns pousam nas pontas dos juncos e,
+// com 3+ pousados próximos, linhas finas de constelação (alpha 0.15) ligam-os por alguns segundos.
+window.LQ = window.LQ || {};
+(function(){
+  'use strict';
+  const LQ = window.LQ;
+  const MAX = 15, BASE = 5;
+  const FLEE_R = 150, FLEE_D = 30, FLEE_T = 0.6, SHINE_T = 2.0;
+  const HIT_R = 16, CONST_R = 110;
+  const flies = [];
+  let lastChime = -1e9, constAlpha = 0, constTimer = 0;
+  const pairs = [];   // pares ligados por linhas de constelação
+
+  function mk(rnd){
+    return {
+      // posição base normalizada (x 0..1, y 0..1 na faixa horizonte→fundo)
+      bx: rnd(), by: 0.05 + rnd() * 0.85,
+      ax: 0.02 + rnd() * 0.05, ay: 0.02 + rnd() * 0.04,      // amplitudes (fração de W/H)
+      f1: 0.15 + rnd() * 0.2, f2: 0.31 + rnd() * 0.3,        // frequências dos senos
+      p1: rnd() * 6.28, p2: rnd() * 6.28, p3: rnd() * 6.28, p4: rnd() * 6.28,
+      period: 2 + rnd() * 2, pph: rnd() * 6.28,              // pulso 2-4 s
+      drift: (rnd() - 0.5) * 0.01,                           // deriva lenta da base
+      x: 0, y: 0, fx: 0, fy: 0, flee: 10, shine: 10,         // fuga e brilho (timers)
+      state: 0, perch: null, st: 0, land: 0, px: 0, py: 0,    // 0 voa, 1 pousando, 2 pousado, 3 decolando
+      sx: 0, sy: 0, wait: 8 + rnd() * 20,                     // origem do pouso; espera até tentar pousar
+      born: -1                                                // game.t do nascimento (fade)
+    };
+  }
+
+  function alive(game){
+    if (!game.has('fireflies')) return 0;
+    return game.has('fireflies2') ? MAX : BASE;
+  }
+
+  function freePos(f, game){
+    const W = game.W, hy = game.horizonY, wh = game.H - hy, t = game.t;
+    const x = (f.bx + f.ax * (Math.sin(t * f.f1 + f.p1) + 0.5 * Math.sin(t * f.f2 + f.p2))) * W;
+    const y = hy + (f.by + f.ay * (Math.sin(t * f.f1 * 1.3 + f.p3) + 0.5 * Math.sin(t * f.f2 * 0.8 + f.p4))) * wh;
+    return { x, y };
+  }
+
+  function chime(game, x, g){
+    const now = game.t;
+    if (now - lastChime < 0.15) return;   // quase subliminar, nunca em rajada
+    lastChime = now;
+    game.audio.play('firefly', { x: x / game.W, gain: g });
+  }
+
+  const def = {
+    init(game){
+      flies.length = 0;
+      for (let i = 0; i < MAX; i++) flies.push(mk(game.rand));
+      // já acordados em sessão anterior: nascem em t=0 (born<0 significa 'ainda não')
+      if (game.has('fireflies')) for (let i = 0; i < alive(game); i++) flies[i].born = 0;
+    },
+
+    onUnlock(id, game){
+      const n = alive(game);
+      // cada um tilinta ao acordar (em update, quando cruza `born`) — coro esparso
+      for (let i = 0; i < n; i++) if (flies[i].born < 0){ flies[i].born = game.t + (i % BASE) * 0.7; flies[i].woke = false; }
+    },
+
+    update(dt, game){
+      const n = alive(game), rnd = game.rand, t = game.t;
+      const perches = (LQ.reeds && LQ.reeds.perches) ? LQ.reeds.perches(game) : [];
+      const W = game.W, H = game.H;
+      for (let i = 0; i < MAX; i++){
+        const f = flies[i];
+        if (i >= n || f.born < 0 || t < f.born) continue;
+        if (f.woke === false){ f.woke = true; const p0 = freePos(f, game); chime(game, p0.x, 1); }
+        f.flee += dt; f.shine += dt;
+        f.bx += f.drift * dt; if (f.bx < 0.02 || f.bx > 0.98) f.drift = -f.drift;
+        const fp = freePos(f, game);
+
+        if (f.state === 0){
+          f.wait -= dt;
+          // pousar nos juncos é comportamento da fase 6 (fireflies2, §3)
+          if (f.wait <= 0 && perches.length && game.has('fireflies2') && rnd() < 0.5){
+            f.perch = perches[Math.floor(rnd() * perches.length)].reed;
+            f.state = 1; f.st = 0; f.sx = f.x; f.sy = f.y;
+          } else if (f.wait <= 0) f.wait = 10 + rnd() * 20;
+          f.x = fp.x; f.y = fp.y;
+        } else if (f.state === 1){
+          // Pousando: 2,5 s de aproximação suave até a ponta do junco
+          f.st += dt;
+          const k = game.ease.smoothstep(f.st / 2.5);
+          const tx = f.perch.wx, ty = f.perch.wy - 3;
+          f.x = f.sx + (tx - f.sx) * k + Math.sin(f.st * 5) * 6 * (1 - k);
+          f.y = f.sy + (ty - f.sy) * k;
+          if (f.st >= 2.5){ f.state = 2; f.land = 6 + rnd() * 14; }
+        } else if (f.state === 2){
+          f.land -= dt;
+          f.x = f.perch.wx; f.y = f.perch.wy - 3;
+          if (f.land <= 0 || f.flee < FLEE_T){
+            // Decola: a base passa a ser onde está
+            f.state = 0; f.perch = null; f.wait = 15 + rnd() * 25;
+            f.bx = Math.min(0.98, Math.max(0.02, f.x / W));
+            f.by = Math.min(0.9, Math.max(0.05, (f.y - game.horizonY) / (H - game.horizonY)));
+            f.p1 = -t * f.f1; f.p2 = -t * f.f2; f.p3 = -t * f.f1 * 1.3; f.p4 = -t * f.f2 * 0.8;
+          }
+        }
+        // Fuga do anel: 30 px em 600 ms, depois volta devagar
+        if (f.flee < FLEE_T){
+          const k = game.ease.easeOutQuad(f.flee / FLEE_T);
+          f.x += f.fx * k; f.y += f.fy * k;
+        } else if (f.flee < FLEE_T + 1.5){
+          const k = 1 - (f.flee - FLEE_T) / 1.5;
+          f.x += f.fx * k; f.y += f.fy * k;
+        }
+      }
+
+      // Constelação: 3+ pousados a <110 px entre si
+      pairs.length = 0;
+      const perched = [];
+      for (let i = 0; i < n; i++) if (flies[i].state === 2 && flies[i].born >= 0) perched.push(flies[i]);
+      let cluster = false;
+      if (perched.length >= 3){
+        for (let a = 0; a < perched.length; a++){
+          let near = 0;
+          for (let b = 0; b < perched.length; b++){
+            if (a === b) continue;
+            const dx = perched[a].x - perched[b].x, dy = perched[a].y - perched[b].y;
+            if (dx * dx + dy * dy < CONST_R * CONST_R){ near++; if (a < b) pairs.push(perched[a], perched[b]); }
+          }
+          if (near >= 2) cluster = true;
+        }
+      }
+      if (cluster){
+        constTimer += dt;
+        // Aparece em 1,5 s, fica ~6 s, some em 2 s; depois descansa
+        const c = constTimer % 14;
+        constAlpha = c < 1.5 ? c / 1.5 : c < 7.5 ? 1 : c < 9.5 ? 1 - (c - 7.5) / 2 : 0;
+      } else { constTimer = 0; constAlpha = Math.max(0, constAlpha - dt); }
+    },
+
+    draw(layer, ctx, game){
+      if (layer !== 'light') return;
+      const n = alive(game), t = game.t;
+      if (!n) return;
+      const P = game.palette;
+      const dayFade = 1 - game.dayPhase;                // se retiram no amanhecer
+      if (dayFade <= 0.01) return;
+      const R = game.eco ? 10 : 14;
+      const glow = game.sprite.glow(P.firefly, R);
+      const eff = game.unlockFade('fireflies');
+
+      // Linhas de constelação entre pousados
+      if (constAlpha > 0.01 && pairs.length){
+        ctx.strokeStyle = P.firefly; ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.15 * constAlpha * dayFade * game.unlockFade('fireflies2');
+        ctx.beginPath();
+        for (let i = 0; i < pairs.length; i += 2){ ctx.moveTo(pairs[i].x, pairs[i].y); ctx.lineTo(pairs[i + 1].x, pairs[i + 1].y); }
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = P.light;
+      for (let i = 0; i < n; i++){
+        const f = flies[i];
+        if (f.born < 0 || t < f.born) continue;
+        const bornK = game.ease.smoothstep((t - f.born) / 5);
+        const fade = (i < BASE ? eff : game.unlockFade('fireflies2')) * bornK * dayFade;
+        if (fade <= 0.01) continue;
+        // Pulso lento (2-4 s) — respiração de luz
+        let b = 0.5 + 0.5 * Math.sin(t * Math.PI * 2 / f.period + f.pph);
+        b = 0.25 + 0.75 * b * b;
+        if (f.state === 2) b *= 0.7;                    // pousado: mais quieto
+        let shine = 0;
+        if (f.shine < SHINE_T) shine = Math.sin(Math.PI * Math.min(1, f.shine / SHINE_T)) * 0.8;
+        const a = Math.min(1, (b * 0.55 + shine)) * fade;
+        const s = R * (1 + shine * 0.6);
+        ctx.globalAlpha = a;
+        ctx.drawImage(glow, f.x - s, f.y - s, s * 2, s * 2);
+        // Núcleo claro de 1,5 px
+        ctx.globalAlpha = Math.min(1, a * 1.4);
+        ctx.fillRect(f.x - 0.75, f.y - 0.75, 1.5, 1.5);
+      }
+      ctx.globalAlpha = 1;
+    },
+
+    // Anel: quem está a <150 px foge 30 px e brilha 2 s (tilintar)
+    onRipple(x, y, game){
+      const n = alive(game);
+      let any = false;
+      for (let i = 0; i < n; i++){
+        const f = flies[i];
+        if (f.born < 0 || game.t < f.born) continue;
+        const dx = f.x - x, dy = f.y - y, d2 = dx * dx + dy * dy;
+        if (d2 > FLEE_R * FLEE_R || d2 < 1) continue;
+        const d = Math.sqrt(d2);
+        f.fx = dx / d * FLEE_D; f.fy = dy / d * FLEE_D;
+        f.flee = 0; f.shine = 0; any = true;
+      }
+      if (any) chime(game, x, 0.5);
+    },
+
+    // Clique num vagalume: pulso de brilho + mesma nota uma oitava acima
+    onClick(x, y, game){
+      const n = alive(game);
+      let best = null, bd = HIT_R * HIT_R;
+      for (let i = 0; i < n; i++){
+        const f = flies[i];
+        if (f.born < 0 || game.t < f.born) continue;
+        const dx = f.x - x, dy = f.y - y, d2 = dx * dx + dy * dy;
+        if (d2 < bd){ bd = d2; best = f; }
+      }
+      if (!best) return false;
+      best.shine = 0;
+      best.fx = 0; best.fy = 0;
+      const nx = Math.min(1, Math.max(0, best.x / game.W));
+      const ny = Math.min(1, Math.max(0, (best.y - game.horizonY) / (game.H - game.horizonY)));
+      game.audio.play('pulse', { x: nx, y: ny, gain: 1 });
+      return true;
+    }
+  };
+
+  LQ.register('fireflies', def);
+  LQ.fireflies = { list: flies }; // leitura (depuração/outras entidades)
+})();
+
+</script>
+<script>
+// Lago Quieto — peixes: sombras em Bézier, curvam para anéis, saltam, mergulham ao clique.
+(function(){
+  'use strict';
+  const TWO_PI = Math.PI * 2;
+  const TRAIL = 4;           // posições do rastro
+  const JUMP_T = 0.6;        // duração do arco (s)
+  const DIVE_T = 1.6;        // mergulho ao clique (s)
+  const CURVE_R = 250;       // raio de atração dos anéis
+
+  const fish = [];
+  let goldSeen = false;
+  let lastW = 0, lastH = 0, lastTop = 0, lastBot = 0; // geometria do último resize
+
+  function makeFish(gold){
+    const f = { gold: !!gold, x: 0, y: 0, ang: 0, len: 22, alpha: 0, trail: [],
+      p0: null, p1: null, p2: null, p3: null, u: 0, dur: 6,   // curva atual
+      pull: null, pullT: 0,                                    // atração ao anel
+      jumping: 0, jx: 0, jy: 0, jumped: false, jumpTimer: 0,
+      diving: 0, dx: 0, dy: 0, tx: 0, ty: 0, born: false };
+    for (let i = 0; i < TRAIL; i++) f.trail.push({ x: 0, y: 0 });
+    return f;
+  }
+  function waterBand(game){
+    const top = game.horizonY + 24, bot = game.H - 30;
+    return { top, bot };
+  }
+  function randPoint(game){
+    const b = waterBand(game);
+    return { x: 20 + game.rand() * (game.W - 40), y: b.top + game.rand() * (b.bot - b.top) };
+  }
+  // Nova curva de Bézier partindo da posição atual (ou entrando pela borda se recém-nascido)
+  function newPath(f, game){
+    if (!f.born){
+      const b = waterBand(game);
+      f.born = true;
+      f.x = game.rand() < 0.5 ? -40 : game.W + 40;
+      f.y = b.top + game.rand() * (b.bot - b.top);
+    }
+    f.p0 = { x: f.x, y: f.y };
+    f.p3 = randPoint(game);
+    // controles: seguem a direção atual e depois curvam
+    const d = 120 + game.rand() * 160;
+    f.p1 = { x: f.x + Math.cos(f.ang) * d, y: f.y + Math.sin(f.ang) * d * 0.5 };
+    f.p2 = { x: f.p3.x + (game.rand() - 0.5) * 260, y: f.p3.y + (game.rand() - 0.5) * 120 };
+    f.u = 0;
+    const dist = Math.hypot(f.p3.x - f.p0.x, f.p3.y - f.p0.y);
+    f.dur = Math.max(4, dist / (28 + game.rand() * 14)); // ~30-40 px/s
+    f.jumpTimer = 6 + game.rand() * 14;
+  }
+  function bez(a, b, c, d, t){
+    const s = 1 - t;
+    return s*s*s*a + 3*s*s*t*b + 3*s*t*t*c + t*t*t*d;
+  }
+  function pushTrail(f){
+    for (let i = TRAIL - 1; i > 0; i--){ f.trail[i].x = f.trail[i-1].x; f.trail[i].y = f.trail[i-1].y; }
+    f.trail[0].x = f.x; f.trail[0].y = f.y;
+  }
+  function startJump(f, game){
+    f.jumping = 1e-6; f.jumped = false; f.jx = f.x; f.jy = f.y;
+    game.audio.play(f.gold ? 'fishJumpGold' : 'fishJump', { x: f.x / game.W, y: 0.4, gain: 1 });
+    if (f.gold && !goldSeen){ goldSeen = true; game.achievement('golden_fish'); }
+  }
+  function startDive(f, game){
+    f.diving = 1e-6; f.dx = f.x; f.dy = f.y;
+    // ressurge 200 px adiante na direção atual, dentro da água
+    const b = waterBand(game);
+    let tx = f.x + Math.cos(f.ang) * 200, ty = f.y + Math.sin(f.ang) * 200 * 0.4;
+    if (tx < 20 || tx > game.W - 20){ tx = f.x - Math.cos(f.ang) * 200; f.ang += Math.PI; }
+    f.tx = Math.min(game.W - 20, Math.max(20, tx));
+    f.ty = Math.min(b.bot, Math.max(b.top, ty));
+    game.spawnRipple(f.x, f.y, { strength: 0.6, rings: 2 });
+    game.spawnDrops(f.x, f.y, 2);
+    game.audio.play('plop', { x: f.x / game.W, y: 0.3, gain: 0.25 });
+  }
+  function fishCount(game){
+    if (!game.has('fish')) return 0;
+    return game.has('fish2') ? 3 : 1;
+  }
+  function fadeOf(f, game){
+    return f.gold || fish.indexOf(f) > 0 ? game.unlockFade('fish2') : game.unlockFade('fish');
+  }
+
+  LQ.register('fish', {
+    init(game){
+      fish.length = 0;
+      fish.push(makeFish(false)); fish.push(makeFish(false)); fish.push(makeFish(true));
+      for (const f of fish) f.ang = game.rand() * TWO_PI;
+      const b = waterBand(game); lastW = game.W; lastH = game.H; lastTop = b.top; lastBot = b.bot;
+    },
+    // janela mudou: reposiciona proporcionalmente à faixa d'água e recomeça a curva daí
+    onResize(game){
+      const b = waterBand(game);
+      if (!lastW || !lastH){ lastW = game.W; lastH = game.H; lastTop = b.top; lastBot = b.bot; return; }
+      const sx = game.W / lastW, sy = (b.bot - b.top) / Math.max(1, lastBot - lastTop);
+      for (const f of fish){
+        if (!f.born) continue;
+        f.x *= sx; f.y = b.top + (f.y - lastTop) * sy;
+        f.x = Math.min(game.W + 40, Math.max(-40, f.x));
+        f.y = Math.min(b.bot, Math.max(b.top, f.y));
+        for (const p of f.trail){ p.x = f.x; p.y = f.y; }
+        f.jumping = 0; f.diving = 0; f.pull = null;
+        newPath(f, game);
+      }
+      lastW = game.W; lastH = game.H; lastTop = b.top; lastBot = b.bot;
+    },
+    update(dt, game){
+      const n = fishCount(game);
+      const band = waterBand(game);
+      for (let i = 0; i < fish.length; i++){
+        const f = fish[i];
+        if (i >= n){ f.alpha = 0; continue; }
+        f.alpha = 0.35 * fadeOf(f, game);
+        if (!f.p0) newPath(f, game);
+
+        // Mergulho (clique): invisível, reaparece adiante
+        if (f.diving > 0){
+          f.diving += dt;
+          const k = Math.min(1, f.diving / DIVE_T);
+          f.x = f.dx + (f.tx - f.dx) * k; f.y = f.dy + (f.ty - f.dy) * k;
+          if (k >= 1){
+            f.diving = 0;
+            game.spawnRipple(f.x, f.y, { strength: 0.4, rings: 1 });
+            for (const p of f.trail){ p.x = f.x; p.y = f.y; }
+            newPath(f, game);
+          }
+          continue;
+        }
+        // Salto: sombra parada, corpo em arco na camada de luz
+        if (f.jumping > 0){
+          f.jumping += dt;
+          if (f.jumping >= JUMP_T){
+            f.jumping = 0;
+            game.spawnRipple(f.x, f.y, { strength: 0.7, rings: 2 });
+            game.spawnDrops(f.x, f.y, 4, f.gold ? game.palette.gold : null); // dourado: gotas douradas
+          }
+          continue;
+        }
+
+        // Avança na curva
+        f.u += dt / f.dur;
+        if (f.u >= 1){ newPath(f, game); }
+        let nx = bez(f.p0.x, f.p1.x, f.p2.x, f.p3.x, f.u);
+        let ny = bez(f.p0.y, f.p1.y, f.p2.y, f.p3.y, f.u);
+        // Atração ao anel (dura ~1.5 s, mistura suavemente)
+        if (f.pull){
+          f.pullT -= dt;
+          const w = game.ease.smoothstep(Math.min(1, f.pullT / 1.5)) * 0.6;
+          nx += (f.pull.x - nx) * w * dt * 2; ny += (f.pull.y - ny) * w * dt * 2;
+          const d = Math.hypot(f.pull.x - nx, f.pull.y - ny);
+          if (f.pullT <= 0 || d < 20){
+            if (game.calm > 8 && d < 40 && f.pullT > 0) startJump(f, game);
+            f.pull = null;
+          }
+        }
+        const mvx = nx - f.x, mvy = ny - f.y;
+        if (Math.abs(mvx) + Math.abs(mvy) > 0.05){
+          const target = Math.atan2(mvy, mvx);
+          let da = target - f.ang; while (da > Math.PI) da -= TWO_PI; while (da < -Math.PI) da += TWO_PI;
+          f.ang += da * Math.min(1, dt * 4);
+        }
+        f.x = nx; f.y = Math.min(band.bot, Math.max(band.top, ny)); // nunca acima do horizonte
+        // Rastro: guarda a cada ~80 ms
+        f._tt = (f._tt || 0) + dt;
+        if (f._tt >= 0.08){ f._tt = 0; pushTrail(f); }
+        // Salto espontâneo (só com fish2 ou modo ambiente)
+        f.jumpTimer -= dt;
+        if (f.jumpTimer <= 0){
+          f.jumpTimer = 15 + game.rand() * 30;
+          const spont = game.has('fish2') || game.sinceClick > 20;
+          if (spont && f.y > game.horizonY + 40) startJump(f, game);
+        }
+      }
+    },
+    onRipple(x, y, game){
+      const n = fishCount(game);
+      let best = null, bd = CURVE_R;
+      for (let i = 0; i < n; i++){
+        const f = fish[i];
+        if (f.jumping || f.diving || !f.born) continue;
+        const d = Math.hypot(f.x - x, (f.y - y) * 1.5);
+        if (d < bd){ bd = d; best = f; }
+      }
+      if (best){
+        best.pull = { x, y }; best.pullT = 1.5 + game.rand() * 0.5;
+        // recomeça a curva a partir de onde está para a atração não brigar com o Bézier
+        best.p0 = { x: best.x, y: best.y }; best.u = 0;
+        best.p3 = { x: x + (game.rand() - 0.5) * 120, y: y + (game.rand() - 0.5) * 40 };
+        best.p1 = { x: best.x + Math.cos(best.ang) * 60, y: best.y + Math.sin(best.ang) * 30 };
+        best.p2 = { x: x, y: y };
+        best.dur = Math.max(1.6, bd / 90);
+        // calm alto: o mais próximo salta chegando (0.5–2 s depois do clique)
+        if (game.calm > 8) best.pullT = Math.min(best.pullT, 1.2);
+      }
+    },
+    onClick(x, y, game){
+      const n = fishCount(game);
+      for (let i = 0; i < n; i++){
+        const f = fish[i];
+        if (f.jumping || f.diving || f.alpha <= 0.05) continue;
+        const dx = x - f.x, dy = y - f.y;
+        if (dx * dx + dy * dy * 4 < 26 * 26){ startDive(f, game); return true; }
+      }
+      return false;
+    },
+    draw(layer, ctx, game){
+      const n = fishCount(game);
+      if (n === 0) return;
+      if (layer === 'fish'){
+        ctx.fillStyle = game.palette.dark;
+        for (let i = 0; i < n; i++){
+          const f = fish[i];
+          if (f.alpha <= 0.01 || f.diving || f.jumping) continue;
+          // rastro: 4 posições, alpha decrescente
+          for (let k = TRAIL - 1; k >= 0; k--){
+            const p = f.trail[k];
+            ctx.globalAlpha = f.alpha * (0.5 - k * 0.11);
+            ctx.beginPath(); ctx.ellipse(p.x, p.y, f.len * 0.7 * (1 - k * 0.12), f.len * 0.22, f.ang, 0, TWO_PI); ctx.fill();
+          }
+          ctx.globalAlpha = f.alpha;
+          ctx.beginPath(); ctx.ellipse(f.x, f.y, f.len, f.len * 0.36, f.ang, 0, TWO_PI); ctx.fill();
+          // cauda
+          const tx = f.x - Math.cos(f.ang) * f.len * 1.1, ty = f.y - Math.sin(f.ang) * f.len * 1.1;
+          ctx.beginPath(); ctx.ellipse(tx, ty, f.len * 0.35, f.len * 0.2, f.ang + 0.6, 0, TWO_PI); ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+      } else if (layer === 'light'){
+        // corpo saltando: arco 600 ms, parábola até 46 px; reflexo claro na camada aditiva
+        for (let i = 0; i < n; i++){
+          const f = fish[i];
+          if (!f.jumping) continue;
+          const k = f.jumping / JUMP_T;
+          const h = Math.sin(Math.PI * k) * 46;
+          const x = f.jx + (k - 0.5) * 40, y = f.jy - h;
+          const rot = (k - 0.5) * 2.2; // sobe inclinado, desce de cabeça
+          const col = f.gold ? game.palette.gold : game.palette.light;
+          const a = 0.55 * Math.sin(Math.PI * Math.min(1, k * 1.15)) * fadeOf(f, game);
+          ctx.fillStyle = col;
+          for (let e = 3; e >= 1; e--){ // 3 elipses concêntricas = glow
+            ctx.globalAlpha = a * (e === 1 ? 1 : 0.18 / e);
+            ctx.beginPath(); ctx.ellipse(x, y, f.len * 0.8 * (1 + (e - 1) * 0.45), f.len * 0.28 * (1 + (e - 1) * 0.6), rot, 0, TWO_PI); ctx.fill();
+          }
+          // sombra que fica na água
+          ctx.globalAlpha = a * 0.3;
+          ctx.beginPath(); ctx.ellipse(f.jx, f.jy, f.len * 0.8, f.len * 0.25, 0, 0, TWO_PI); ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+      }
+    }
+  });
+})();
+
+</script>
+<script>
+// Lago Quieto — lírios d'água: discos derivando, balançam com anéis, florescem ao clique.
+(function(){
+  'use strict';
+  const TWO_PI = Math.PI * 2;
+  const BLOOM_T = 3;   // flor abre em 3 s
+  const lilies = [];
+  // Área dos controles (coleção + barra de ícones, centro inferior): lírios não entram
+  // (bot = H-100 mantém o centro acima da coleção; a zona central até H-150 cobre raio+balanço)
+  const UI_H = 100, ZONE_H = 150, UI_HALF_W = 230;
+  function inZone(y, game){ return y > game.H - ZONE_H; }
+  function zoneL(game){ return game.W / 2 - UI_HALF_W; }
+  function zoneR(game){ return game.W / 2 + UI_HALF_W; }
+  function safeX(x, y, game){
+    if (!inZone(y, game) || x < zoneL(game) || x > zoneR(game)) return x;
+    const left = zoneL(game), right = zoneR(game);
+    if (left < 30 && right > game.W - 30) return x; // tela estreita: sem espaço lateral
+    if (left < 30) return right;
+    if (right > game.W - 30) return left;
+    return x < game.W / 2 ? left : right;
+  }
+
+  function place(game){
+    lilies.length = 0;
+    const n = 3 + Math.floor(game.rand() * 3); // 3-5
+    const top = game.horizonY + game.H * 0.12, bot = game.H - UI_H;
+    for (let i = 0; i < n; i++){
+      const y = top + (i + game.rand()) / n * (bot - top);
+      const depth = (y - game.horizonY) / (game.H - game.horizonY); // 0 longe, 1 perto
+      const x = safeX(30 + game.rand() * (game.W - 60), y, game);
+      lilies.push({
+        x, y, r: 10 + depth * 16,
+        rot: game.rand() * TWO_PI, notch: game.rand() * TWO_PI,
+        vx: (game.rand() - 0.5) * 3, ph: game.rand() * TWO_PI,
+        bob: 0, bobV: 0,            // oscilação vertical por anéis (mola amortecida)
+        bloomed: false, bloom: 0
+      });
+    }
+    game.lilyCount = n;
+  }
+
+  LQ.register('lilies', {
+    init(game){ place(game); },
+    onUnlock(id, game){ if (id === 'lilies') place(game); },
+    onResize(game){
+      const top = game.horizonY + game.H * 0.12, bot = game.H - UI_H;
+      for (const L of lilies){
+        L.x = Math.min(game.W - 30, Math.max(30, L.x));
+        L.y = Math.min(bot, Math.max(top, L.y));
+        L.x = safeX(L.x, L.y, game);
+      }
+    },
+    update(dt, game){
+      if (!game.has('lilies')) return;
+      for (const L of lilies){
+        // deriva lenta, ida e volta
+        L.x += L.vx * dt;
+        if (L.x < 30){ L.x = 30; L.vx = Math.abs(L.vx); }
+        else if (L.x > game.W - 30){ L.x = game.W - 30; L.vx = -Math.abs(L.vx); }
+        // não deriva para debaixo dos controles (centro inferior): as bordas da zona são paredes
+        if (inZone(L.y, game)){
+          const zl = zoneL(game), zr = zoneR(game);
+          if (L.x > zl && L.x < zr){
+            if (L.x - zl < zr - L.x && zl >= 30){ L.x = zl; L.vx = -Math.abs(L.vx); }
+            else if (zr <= game.W - 30){ L.x = zr; L.vx = Math.abs(L.vx); }
+          }
+        }
+        if (game.rand() < 0.002) L.vx = (game.rand() - 0.5) * 3;
+        // mola amortecida para o balanço (com teto: spam nunca vira raio negativo)
+        const acc = -L.bob * 30 - L.bobV * 3;
+        L.bobV = Math.min(80, Math.max(-80, L.bobV + acc * dt));
+        L.bob = Math.min(25, Math.max(-25, L.bob + L.bobV * dt));
+        if (L.bloom > 0 && L.bloom < BLOOM_T) L.bloom = Math.min(BLOOM_T, L.bloom + dt);
+      }
+    },
+    onRipple(x, y, game){
+      if (!game.has('lilies')) return;
+      for (const L of lilies){
+        const d = Math.hypot(L.x - x, (L.y - y) / 0.35);
+        if (d < 220) L.bobV += 40 * (1 - d / 220);
+      }
+    },
+    onClick(x, y, game){
+      if (!game.has('lilies') || game.unlockFade('lilies') < 0.5) return false;
+      for (const L of lilies){
+        const dx = x - L.x, dy = (y - L.y - L.bob) / 0.45;
+        if (dx * dx + dy * dy < (L.r + 4) * (L.r + 4)){
+          L.bobV += 25;
+          if (!L.bloomed){
+            L.bloomed = true; L.bloom = 1e-6;
+            game.state.liliesBloomed++;
+            game.audio.play('bloom', { x: x / game.W, y: 0.4, gain: 1 });
+            game.ui.refreshCollection('flower');
+            if (lilies.every(l => l.bloomed)) game.achievement('night_bloom');
+          } else {
+            game.audio.play('pulse', { x: x / game.W, y: 0.4, gain: 1 });
+          }
+          game.spawnRipple(L.x, L.y + L.r * 0.5, { strength: 0.35, rings: 1 });
+          return true;
+        }
+      }
+      return false;
+    },
+    draw(layer, ctx, game){
+      if (!game.has('lilies')) return;
+      const fade = game.unlockFade('lilies');
+      if (fade <= 0.01) return;
+      if (layer === 'lilies'){
+        ctx.fillStyle = game.palette.dark;
+        for (const L of lilies){
+          const y = L.y + L.bob, sway = Math.max(0.7, Math.min(1.3, 1 + L.bob * 0.01));
+          ctx.globalAlpha = 0.9 * fade;
+          // disco elíptico com um recorte (folha de lírio)
+          ctx.beginPath();
+          ctx.ellipse(L.x, y, L.r * sway, L.r * 0.45 / sway, 0, 0, TWO_PI);
+          ctx.fill();
+          ctx.fillStyle = game.palette.horizon;
+          ctx.globalAlpha = 0.9 * fade;
+          ctx.beginPath();
+          ctx.moveTo(L.x, y);
+          ctx.lineTo(L.x + Math.cos(L.notch) * L.r * 1.05, y + Math.sin(L.notch) * L.r * 0.5);
+          ctx.lineTo(L.x + Math.cos(L.notch + 0.5) * L.r * 1.05, y + Math.sin(L.notch + 0.5) * L.r * 0.5);
+          ctx.closePath(); ctx.fill();
+          ctx.fillStyle = game.palette.dark;
+          // brilho de borda molhada: fina elipse mais clara na parte de trás
+          ctx.globalAlpha = 0.12 * fade;
+          ctx.fillStyle = game.palette.light;
+          ctx.beginPath(); ctx.ellipse(L.x, y - L.r * 0.1, L.r * 0.8, L.r * 0.18, 0, Math.PI, TWO_PI); ctx.fill();
+          ctx.fillStyle = game.palette.dark;
+        }
+        ctx.globalAlpha = 1;
+      } else if (layer === 'light'){
+        // flores brancas abrindo (pétalas = elipses radiais), centro dourado
+        for (const L of lilies){
+          if (L.bloom <= 0) continue;
+          const k = game.ease.smoothstep(L.bloom / BLOOM_T);
+          const y = L.y + L.bob - L.r * 0.25;
+          const pr = L.r * 0.55 * k;
+          ctx.fillStyle = game.palette.light;
+          const petals = 8;
+          for (let i = 0; i < petals; i++){
+            const a = L.rot + i / petals * TWO_PI;
+            const px = L.x + Math.cos(a) * pr * 0.55, py = y + Math.sin(a) * pr * 0.25;
+            ctx.globalAlpha = 0.28 * fade * k;
+            ctx.beginPath(); ctx.ellipse(px, py, pr * 0.6, pr * 0.22, a, 0, TWO_PI); ctx.fill();
+          }
+          // glow suave sob a flor (sprite cacheado)
+          const sp = game.sprite.glow(game.palette.light, 30);
+          ctx.globalAlpha = 0.12 * k * fade;
+          ctx.drawImage(sp, L.x - L.r, y - L.r * 0.5, L.r * 2, L.r);
+          ctx.fillStyle = game.palette.gold;
+          ctx.globalAlpha = 0.6 * k * fade;
+          ctx.beginPath(); ctx.ellipse(L.x, y, pr * 0.22, pr * 0.12, 0, 0, TWO_PI); ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+      }
+    }
+  });
+})();
+
+</script>
+<script>
+// Lago Quieto — sapo: silhueta na margem com 3 poses (parado, inflado, pulando), coaxa e pula.
+(function(){
+  'use strict';
+  const TWO_PI = Math.PI * 2;
+  const JUMP_T = 0.7;
+  const frog = { x: 0, y: 0, dir: 1, pose: 0, puff: 0, croakTimer: 50, jumping: 0, jx: 0, jy: 0, tx: 0, ty: 0, blink: 0 };
+
+  function home(game){
+    // senta na margem inferior direita (juncos ficam à esquerda)
+    frog.x = game.W * (0.72 + game.rand() * 0.18);
+    frog.y = game.H - 22 - game.rand() * 10;
+    frog.dir = -1;
+    frog.croakTimer = 40 + game.rand() * 50;
+  }
+  function croak(game){
+    frog.puff = 1e-6;
+    game.audio.play('frog', { x: frog.x / game.W, y: 0.9, gain: 1 });
+  }
+  function jump(game){
+    if (frog.jumping) return;
+    frog.jumping = 1e-6; frog.jx = frog.x; frog.jy = frog.y;
+    // pula para um ponto próximo na margem, virando-se
+    let tx = frog.x + frog.dir * (60 + game.rand() * 50);
+    if (tx < game.W * 0.55 || tx > game.W - 30){ frog.dir = -frog.dir; tx = frog.x + frog.dir * 80; }
+    frog.tx = Math.min(game.W - 30, Math.max(game.W * 0.55, tx));
+    frog.ty = game.H - 22 - game.rand() * 12;
+    croak(game);
+  }
+
+  LQ.register('frog', {
+    init(game){ home(game); },
+    onUnlock(id, game){ if (id === 'frog') home(game); },
+    onResize(game){
+      // volta a sentar na margem inferior (y era relativo ao H antigo); x limitado à faixa da direita
+      frog.jumping = 0;
+      frog.x = Math.min(game.W - 30, Math.max(game.W * 0.55, frog.x));
+      frog.y = game.H - 22 - game.rand() * 10;
+    },
+    update(dt, game){
+      if (!game.has('frog')) return;
+      if (frog.x > game.W - 20) home(game); // após resize
+      if (frog.puff > 0){ frog.puff += dt; if (frog.puff > 0.45) frog.puff = 0; }
+      if (frog.jumping > 0){
+        frog.jumping += dt;
+        const k = Math.min(1, frog.jumping / JUMP_T);
+        frog.x = frog.jx + (frog.tx - frog.jx) * k;
+        frog.y = frog.jy + (frog.ty - frog.jy) * k;
+        if (k >= 1){
+          frog.jumping = 0;
+          // pouso na margem: anel na água logo acima
+          game.spawnRipple(frog.x - frog.dir * 10, frog.y - 14, { strength: 0.6, rings: 2 });
+          game.spawnDrops(frog.x, frog.y - 12, 3);
+          game.audio.play('plop', { x: frog.x / game.W, y: 0.9, gain: 0.2 });
+        }
+        return;
+      }
+      frog.croakTimer -= dt;
+      if (frog.croakTimer <= 0){ frog.croakTimer = 40 + game.rand() * 50; croak(game); }
+      frog.blink -= dt;
+      if (frog.blink <= -0.15) frog.blink = 3 + game.rand() * 5;
+    },
+    onClick(x, y, game){
+      if (!game.has('frog') || game.unlockFade('frog') < 0.5) return false;
+      if (Math.hypot(x - frog.x, y - frog.y) < 60){ jump(game); return true; }
+      return false;
+    },
+    draw(layer, ctx, game){
+      if (layer !== 'lilies' || !game.has('frog')) return;
+      const fade = game.unlockFade('frog');
+      if (fade <= 0.01) return;
+      let x = frog.x, y = frog.y, pose = 0, h = 0;
+      if (frog.jumping > 0){
+        const k = frog.jumping / JUMP_T;
+        h = Math.sin(Math.PI * k) * 34; pose = 2;
+      } else if (frog.puff > 0) pose = 1;
+      const puff = pose === 1 ? Math.sin(Math.PI * frog.puff / 0.45) : 0;
+      const d = frog.dir;
+      ctx.save();
+      ctx.translate(x, y - h);
+      ctx.scale(d, 1);
+      ctx.fillStyle = game.palette.dark;
+      ctx.globalAlpha = 0.95 * fade;
+      // corpo
+      const bw = 14 + (pose === 2 ? 3 : 0), bh = 9 - (pose === 2 ? 2 : 0);
+      ctx.beginPath(); ctx.ellipse(0, -bh, bw, bh, pose === 2 ? -0.35 : 0, 0, TWO_PI); ctx.fill();
+      // cabeça
+      ctx.beginPath(); ctx.ellipse(10, -bh - 4, 8, 6, 0, 0, TWO_PI); ctx.fill();
+      // olhos (protuberâncias)
+      ctx.beginPath(); ctx.arc(12, -bh - 9, 2.6, 0, TWO_PI); ctx.arc(7, -bh - 10, 2.4, 0, TWO_PI); ctx.fill();
+      // papo inflado
+      if (puff > 0){
+        ctx.globalAlpha = 0.85 * fade;
+        ctx.beginPath(); ctx.ellipse(10, -bh + 2, 6 + 6 * puff, 4 + 5 * puff, 0, 0, TWO_PI); ctx.fill();
+        ctx.globalAlpha = 0.95 * fade;
+      }
+      // pernas
+      ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.strokeStyle = game.palette.dark;
+      ctx.beginPath();
+      if (pose === 2){
+        ctx.moveTo(-10, -bh); ctx.lineTo(-20, -bh + 4); ctx.lineTo(-30, -bh + 10); // traseira esticada
+        ctx.moveTo(8, -bh + 4); ctx.lineTo(14, -bh + 12);                          // dianteira
+      } else {
+        ctx.moveTo(-10, -bh + 2); ctx.lineTo(-18, -bh - 4); ctx.lineTo(-14, 0);    // traseira dobrada
+        ctx.moveTo(8, -bh + 5); ctx.lineTo(10, 0);                                 // dianteira
+      }
+      ctx.stroke();
+      // reflexo dos olhos (pisca)
+      if (frog.blink > 0 && pose !== 2){
+        ctx.fillStyle = game.palette.light;
+        ctx.globalAlpha = 0.5 * fade;
+        ctx.fillRect(12, -bh - 10, 1.5, 1.5); ctx.fillRect(7, -bh - 11, 1.5, 1.5);
+      }
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    }
+  });
+})();
+
+</script>
+<script>
+// Céu: estrelas, lua, nuvem, estrela cadente, aurora, montanhas, pássaros do amanhecer.
+(function(){
+  'use strict';
+  const LQ = window.LQ;
+  const TAU = Math.PI * 2;
+
+  // PRNG local com semente fixa (formas estáveis entre resizes)
+  function mkRand(seed){ let s = seed | 1; return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; }; }
+  function hexToRgb(h){ const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+  function lerpHex(a, b, t){
+    const A = hexToRgb(a), B = hexToRgb(b);
+    return '#' + [0, 1, 2].map(i => Math.max(0, Math.min(255, Math.round(A[i] + (B[i] - A[i]) * t))).toString(16).padStart(2, '0')).join('');
+  }
+
+  // ---------- estrelas ----------
+  const STAR_TOTAL = 60, DYN = 12;
+  const stars = [];        // {nx, ny, size, phase, speed}
+  let starCv = null, starCvN = -1, starCvW = 0, starCvH = 0, starCvVer = -1;
+  let visibleN = 15;
+  let lastW = 0, lastH = 0;
+
+  // ---------- lua ----------
+  let moonCv = null, moonKey = '';
+  let moonRise = null;     // game.t em que começou a nascer (null = ainda não)
+  const MOON_RISE_T = 90;
+  let cloudX = -1, cloudSpeed = 8;
+
+  // ---------- estrela cadente ----------
+  let shootTimer = 0;
+  const shoot = { active: false, x: 0, y: 0, vx: 0, vy: 0, age: 0 };
+
+  // ---------- aurora ----------
+  let auroraCv = null, auroraCtx = null;
+
+  // ---------- montanhas ----------
+  let mBack = null, mFront = null;
+  let mColVer = -1, mColBack = '#000', mColFront = '#000';
+
+  // ---------- pássaros ----------
+  const birds = [];        // {x, y, vx, phase}
+  let prevPhase = -1, dawnDone = false;
+
+
+  function buildStars(game){
+    stars.length = 0;
+    const r = mkRand(7331);
+    for (let i = 0; i < STAR_TOTAL; i++){
+      stars.push({ nx: r(), ny: Math.pow(r(), 0.8), size: r() < 0.25 ? 2 : 1, phase: r() * TAU, speed: 0.6 + r() * 1.6, a: 0.35 + r() * 0.5 });
+    }
+  }
+  function starCount(game){
+    return Math.round(15 + 20 * game.unlockFade('stars2') + 25 * game.unlockFade('sky_alive'));
+  }
+  // Bakea as estrelas assentadas (todas menos as DYN dinâmicas) num offscreen
+  function bakeStars(game, n){
+    const W = game.W, hy = game.horizonY;
+    if (!starCv) starCv = document.createElement('canvas');
+    starCv.width = W; starCv.height = hy;
+    const g = starCv.getContext('2d');
+    g.fillStyle = game.palette.light;
+    const settled = Math.max(0, n - DYN);
+    for (let i = 0; i < settled; i++){
+      const s = stars[i];
+      g.globalAlpha = s.a * 0.8;
+      g.fillRect(Math.round(s.nx * W), Math.round(s.ny * hy), s.size, s.size);
+    }
+    starCvN = n; starCvW = W; starCvH = hy; starCvVer = game.paletteVersion;
+  }
+
+  function buildMoon(game){
+    const R = Math.max(8, Math.round(Math.min(game.W, game.H) * 0.035));
+    const key = R + '|' + game.palette.light;
+    if (key === moonKey && moonCv) return R;
+    moonKey = key;
+    const G = R * 3;
+    if (!moonCv) moonCv = document.createElement('canvas'); // reutiliza o offscreen
+    moonCv.width = moonCv.height = G * 2;
+    const g = moonCv.getContext('2d');
+    const grad = g.createRadialGradient(G, G, R * 0.9, G, G, G);
+    grad.addColorStop(0, game.palette.light + '55');
+    grad.addColorStop(0.4, game.palette.light + '18');
+    grad.addColorStop(1, game.palette.light + '00');
+    g.fillStyle = grad; g.fillRect(0, 0, G * 2, G * 2);
+    g.fillStyle = game.palette.light;
+    g.beginPath(); g.arc(G, G, R, 0, TAU); g.fill();
+    // leve sombra de crateras
+    g.fillStyle = game.palette.horizon; g.globalAlpha = 0.12;
+    g.beginPath(); g.arc(G - R * 0.3, G - R * 0.2, R * 0.28, 0, TAU); g.fill();
+    g.beginPath(); g.arc(G + R * 0.35, G + R * 0.3, R * 0.18, 0, TAU); g.fill();
+    return R;
+  }
+
+  function buildMountains(game){
+    const W = game.W, hy = game.horizonY;
+    const r = mkRand(4242);
+    function ridge(hMax, seg, yBase){
+      const p = new Path2D();
+      p.moveTo(-10, hy + 4);
+      p.lineTo(-10, hy - yBase);
+      let x = -10;
+      const step = W / seg;
+      for (let i = 0; i <= seg + 1; i++){
+        const h = hMax * (0.35 + 0.65 * Math.abs(Math.sin(i * 1.7 + r() * 0.8)) * (0.6 + 0.4 * r()));
+        x = -10 + i * step;
+        p.lineTo(x, hy - yBase - h);
+      }
+      p.lineTo(W + 10, hy - yBase);
+      p.lineTo(W + 10, hy + 4);
+      p.closePath();
+      return p;
+    }
+    mBack = ridge(hy * 0.22, 9, hy * 0.02);
+    mFront = ridge(hy * 0.13, 14, 0);
+  }
+
+  function ensureAurora(game){
+    const w = Math.max(48, Math.round(game.W / 8)), h = Math.max(32, Math.round(game.horizonY / 2)); // 1/8: mais blur de graça
+    if (!auroraCv){ auroraCv = document.createElement('canvas'); auroraCtx = auroraCv.getContext('2d'); }
+    if (auroraCv.width !== w || auroraCv.height !== h){ auroraCv.width = w; auroraCv.height = h; }
+  }
+  // Redesenha o offscreen da aurora: 6 faixas com alpha senoidal, bordas verticais suaves
+  // (3 retângulos empilhados por coluna), ondas com fase/frequência distintas por faixa, janela
+  // horizontal suave (não vai de borda a borda) e faixas de baixo esmaecendo (sem 'degrau').
+  function paintAurora(game, k){
+    ensureAurora(game);
+    const g = auroraCtx, w = auroraCv.width, h = auroraCv.height, t = game.t;
+    g.clearRect(0, 0, w, h);
+    const cols = [game.palette.auroraG, game.palette.auroraP];
+    const sx = (game.W / 4) / w; // frequências em 'px de offscreen 1/4' (spec), independentes da escala real
+    for (let b = 0; b < 6; b++){
+      g.fillStyle = cols[b % 2];
+      const yb = h * (0.08 + b * 0.13), bh = h * 0.14;
+      const fadeB = b >= 4 ? (b === 4 ? 0.7 : 0.4) : 1;
+      for (let x = 0; x < w; x += 2){
+        const X = x * sx;
+        const a = 0.5 + 0.5 * Math.sin(X * 0.025 + t * 0.3 + b * 0.7);
+        const y = yb + Math.sin(X * 0.05 * (0.6 + b * 0.15) + t * 0.2 + b * 1.9) * h * 0.12
+                     + Math.sin(X * 0.013 + t * 0.07 + b) * h * 0.05;
+        const win = Math.pow(Math.sin(Math.PI * (x + 1) / (w + 2)), 0.6); // janela horizontal
+        const base = (0.045 + 0.045 * a) * k * 0.55 * win * fadeB;
+        g.globalAlpha = base * 0.35; g.fillRect(x, y - bh * 0.6, 2, bh);
+        g.globalAlpha = base;        g.fillRect(x, y, 2, bh);
+        g.globalAlpha = base * 0.35; g.fillRect(x, y + bh * 0.6, 2, bh);
+      }
+    }
+    g.globalAlpha = 1;
+  }
+
+  LQ.register('sky', {
+    init(game){
+      buildStars(game);
+      buildMountains(game);
+      lastW = game.W; lastH = game.H;
+      shootTimer = 120 + game.rand() * 120;
+      cloudX = -game.W * 0.2;
+      // lua já desbloqueada em sessão anterior: nasce imediatamente cheia
+      if (game.has('moon')) moonRise = -MOON_RISE_T; // já cheia
+      dawnDone = game.state.achievements.indexOf('until_dawn') >= 0;
+    },
+
+    onUnlock(id, game){
+      if (id === 'moon' && moonRise === null) moonRise = game.t;
+      if (id === 'sky_alive') shootTimer = 30 + game.rand() * 60;
+    },
+
+    onResize(game){ lastW = game.W; lastH = game.H; buildMountains(game); starCvN = -1; },
+    update(dt, game){
+      if (game.W !== lastW || game.H !== lastH){ lastW = game.W; lastH = game.H; buildMountains(game); starCvN = -1; }
+      visibleN = starCount(game);
+
+      // nuvem fina cruzando a lua
+      if (game.has('sky_alive')){
+        cloudX += cloudSpeed * dt;
+        if (cloudX > game.W * 1.3) cloudX = -game.W * 0.3;
+      }
+
+      // estrela cadente
+      if (game.has('sky_alive') && game.dayPhase < 0.3){
+        if (!shoot.active){
+          shootTimer -= dt;
+          if (shootTimer <= 0){
+            shootTimer = 120 + game.rand() * 120;
+            shoot.active = true; shoot.age = 0;
+            shoot.x = game.W * (0.1 + game.rand() * 0.8); shoot.y = game.horizonY * (0.05 + game.rand() * 0.4);
+            const dir = game.rand() < 0.5 ? -1 : 1, sp = 500 + game.rand() * 300;
+            shoot.vx = dir * sp; shoot.vy = sp * (0.25 + game.rand() * 0.25);
+            game.audio.play('shooting', { x: shoot.x / game.W, gain: 1 });
+          }
+        } else {
+          shoot.age += dt; shoot.x += shoot.vx * dt; shoot.y += shoot.vy * dt;
+          if (shoot.age > 0.4) shoot.active = false;
+        }
+      }
+
+      // lua
+      if (moonRise !== null){
+        const R = buildMoon(game);
+        const k = game.ease.smoothstep((game.t - moonRise) / MOON_RISE_T);
+        game.moonR = R;
+        game.moonX = game.W * 0.78;
+        game.moonY = game.horizonY + R * 1.5 - k * (game.horizonY + R * 1.5 - game.horizonY * 0.32);
+        if (k >= 1 && moonRise >= 0) game.achievement('full_moon'); // só se nasceu nesta sessão
+      } else game.moonR = 0;
+
+      // amanhecer: pássaros ao começar a clarear; achievement no dia pleno
+      if (game.has('dawn')){
+        const ph = game.dayPhase;
+        if (prevPhase >= 0 && prevPhase < 0.15 && ph >= 0.15 && ph > prevPhase){
+          birds.length = 0;
+          const dir = game.rand() < 0.5 ? 1 : -1;
+          for (let i = 0; i < 3; i++){
+            birds.push({ x: dir > 0 ? -40 - i * 30 : game.W + 40 + i * 30, y: game.horizonY * (0.3 + i * 0.07 + game.rand() * 0.05), vx: dir * (35 + game.rand() * 10), phase: game.rand() * TAU });
+          }
+          game.audio.play('birds', { x: dir > 0 ? 0.1 : 0.9, gain: 1 });
+        }
+        if (ph >= 0.99 && !dawnDone){ dawnDone = true; game.achievement('until_dawn'); }
+        prevPhase = ph;
+      }
+      for (let i = birds.length - 1; i >= 0; i--){
+        const b = birds[i]; b.x += b.vx * dt; b.phase += dt * 6;
+        if (b.x < -80 || b.x > game.W + 80) birds.splice(i, 1);
+      }
+    },
+
+    draw(layer, ctx, game){
+      const W = game.W, hy = game.horizonY, P = game.palette;
+      const night = 1 - game.dayPhase; // estrelas somem de dia
+
+      if (layer === 'sky'){
+        if (starCvN !== visibleN || starCvW !== W || starCvH !== hy || starCvVer !== game.paletteVersion) bakeStars(game, visibleN);
+        if (night > 0.02){
+          ctx.globalAlpha = night;
+          ctx.drawImage(starCv, 0, 0);
+          // estrelas dinâmicas (piscam mais com o vento)
+          const wind = 0.5 + 0.5 * game.unlockFade('wind');
+          ctx.fillStyle = P.light;
+          const from = Math.max(0, visibleN - DYN);
+          for (let i = from; i < visibleN; i++){
+            const s = stars[i];
+            const tw = 0.5 + 0.5 * Math.sin(game.t * s.speed + s.phase);
+            ctx.globalAlpha = night * s.a * (1 - wind * 0.7 + wind * 0.7 * tw);
+            ctx.fillRect(Math.round(s.nx * W), Math.round(s.ny * hy), s.size, s.size);
+          }
+          ctx.globalAlpha = 1;
+        }
+        // pássaros do amanhecer (3 chevrons)
+        if (birds.length){
+          ctx.strokeStyle = P.dark; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.6;
+          for (const b of birds){
+            const f = 3 + 2 * Math.sin(b.phase);
+            ctx.beginPath(); ctx.moveTo(b.x - 6, b.y - f); ctx.lineTo(b.x, b.y); ctx.lineTo(b.x + 6, b.y - f); ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
+        }
+      }
+
+      else if (layer === 'aurora'){
+        const k = game.unlockFade('aurora') * night;
+        if (k <= 0.01) return;
+        paintAurora(game, k);
+        ctx.drawImage(auroraCv, 0, 0, W, hy * 0.7);
+      }
+
+      else if (layer === 'moon'){
+        if (moonRise !== null && game.moonR > 0){
+          const R = game.moonR, G = R * 3;
+          ctx.globalAlpha = 0.55 + 0.45 * night;
+          ctx.drawImage(moonCv, game.moonX - G, game.moonY - G, G * 2, G * 2);
+          ctx.globalAlpha = 1;
+          // nuvem fina
+          if (game.has('sky_alive')){
+            ctx.fillStyle = P.light; ctx.globalAlpha = 0.08 * game.unlockFade('sky_alive');
+            ctx.beginPath(); ctx.ellipse(cloudX, game.moonY + R * 0.3, R * 3.2, R * 0.45, 0, 0, TAU); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(cloudX + R * 1.5, game.moonY + R * 0.55, R * 2, R * 0.3, 0, 0, TAU); ctx.fill();
+            ctx.globalAlpha = 1;
+          }
+        }
+      }
+
+      else if (layer === 'mountains'){
+        const k = game.unlockFade('fog_clear');
+        if (k <= 0.01 || !mBack) return;
+        const px = game.mouse.x < 0 ? 0 : (game.mouse.x / W - 0.5) * 2; // parallax 2 px
+        ctx.globalAlpha = k;
+        if (mColVer !== game.paletteVersion){ // cores só mudam com a paleta
+          mColVer = game.paletteVersion;
+          mColBack = lerpHex(P.horizon, P.zenith, 0.45);
+          mColFront = lerpHex(lerpHex(P.horizon, P.zenith, 0.85), P.dark, 0.25);
+        }
+        ctx.fillStyle = mColBack;
+        ctx.translate(px * 0.5, 0); ctx.fill(mBack); ctx.translate(-px * 0.5, 0);
+        ctx.fillStyle = mColFront;
+        ctx.translate(px, 0); ctx.fill(mFront); ctx.translate(-px, 0);
+        ctx.globalAlpha = 1;
+      }
+
+      else if (layer === 'water'){
+        // reflexo espelhado das estrelas perto do horizonte (alpha 0.35)
+        if (night > 0.02 && starCv){
+          const sh = Math.round(hy * 0.4);
+          ctx.globalAlpha = 0.35 * night;
+          ctx.save(); ctx.translate(0, hy); ctx.scale(1, -1);
+          ctx.drawImage(starCv, 0, hy - sh, W, sh, 0, -sh, W, sh);
+          ctx.restore();
+          // aurora refletida
+          const ka = game.eco ? 0 : game.unlockFade('aurora') * night;
+          if (ka > 0.01 && auroraCv){
+            ctx.globalAlpha = 0.15 * night;
+            ctx.save(); ctx.translate(0, hy); ctx.scale(1, -1);
+            ctx.drawImage(auroraCv, 0, -hy * 0.7, W, hy * 0.7);
+            ctx.restore();
+          }
+          ctx.globalAlpha = 1;
+        }
+      }
+
+      else if (layer === 'light'){
+        if (shoot.active){
+          const f = 1 - shoot.age / 0.4;
+          ctx.strokeStyle = P.light; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.7 * f;
+          ctx.beginPath(); ctx.moveTo(shoot.x, shoot.y); ctx.lineTo(shoot.x - shoot.vx * 0.12, shoot.y - shoot.vy * 0.12); ctx.stroke();
+          const sp = game.sprite.glow(P.light, 10);
+          ctx.globalAlpha = 0.6 * f;
+          ctx.drawImage(sp, shoot.x - 10, shoot.y - 10, 20, 20);
+          ctx.globalAlpha = 1;
+        }
+      }
+    }
+  });
+})();
+
+</script>
+<script>
+// Névoa baixa: faixa com gradiente cacheado (game.fogSprite), alpha 0.15, offset senoidal; dissipa em 60 s.
+(function(){
+  'use strict';
+  const LQ = window.LQ;
+  const BASE_A = 0.15, CLEAR_T = 60;
+  let clearAt = -1;   // game.t em que começou a dissipar
+  let alpha = BASE_A;
+
+  LQ.register('fog', {
+    init(game){
+      if (game.has('fog_clear')){ clearAt = -CLEAR_T; alpha = 0; }
+    },
+    onUnlock(id, game){
+      if (id === 'fog_clear' && clearAt < 0){
+        clearAt = game.t;
+        game.audio.ambient.set({ fogOpen: true });
+      }
+    },
+    update(dt, game){
+      let k = 1;
+      if (clearAt >= 0) k = 1 - game.ease.smoothstep((game.t - clearAt) / CLEAR_T);
+      alpha = BASE_A * k * (1 - 0.6 * game.dayPhase);
+    },
+    draw(layer, ctx, game){
+      if (layer !== 'fog' || alpha < 0.003) return;
+      const sp = game.fogSprite; if (!sp) return;
+      const off = Math.sin(game.t * 0.3) * 10;
+      const y = game.horizonY - sp.height * 0.45;
+      ctx.globalAlpha = alpha;
+      ctx.drawImage(sp, -20 + off, y);
+      // segunda passada mais tênue e defasada dá profundidade
+      ctx.globalAlpha = alpha * 0.4;
+      ctx.drawImage(sp, -20 - off * 0.6, y + sp.height * 0.25);
+      ctx.globalAlpha = 1;
+    }
+  });
+})();
+
+</script>
+<script>
+// Temas (§8): paletas, partículas próprias e filtro de áudio. Também checa os achievements (§8).
+window.LQ = window.LQ || {};
+(function(){
+  'use strict';
+  const LQ = window.LQ;
+
+  // ---------- Paletas (mesmas chaves de game.palette; núcleo lerpa night→day) ----------
+  const T = LQ.themes = LQ.themes || {};
+  T.night = {}; // padrão do núcleo
+  T.winter = {
+    night: { zenith: '#04060c', horizon: '#0a1220', shore: '#0c1a2a', ring: '#8fb3c9',
+      light: '#eaf3ff', firefly: '#ffb347', gold: '#f0c060', dark: '#0a1a18',
+      auroraG: '#9fd8e6', auroraP: '#8a8ad0', dawn: '#d8dde8', fog: '#ffffff' },
+    day:   { zenith: '#6f87a8', horizon: '#c9d6e6', shore: '#4a6a86', ring: '#cfe3f0',
+      light: '#ffffff', firefly: '#ffb347', gold: '#f0c060', dark: '#1d2f36',
+      auroraG: '#9fd8e6', auroraP: '#8a8ad0', dawn: '#e8e0e8', fog: '#ffffff' }
+  };
+  T.autumn = {
+    night: { zenith: '#0c0810', horizon: '#2a1a14', shore: '#3a2416', ring: '#a86a3c',
+      light: '#ffe6c4', firefly: '#ffd27a', gold: '#f0a030', dark: '#1a120a',
+      auroraG: '#c98a4a', auroraP: '#8a4a5c', dawn: '#f2a882', fog: '#f5e2c8' },
+    day:   { zenith: '#6a7aa0', horizon: '#d8b090', shore: '#7a5a3a', ring: '#d8a070',
+      light: '#fff4e0', firefly: '#ffd27a', gold: '#f0a030', dark: '#2a1e10',
+      auroraG: '#c98a4a', auroraP: '#8a4a5c', dawn: '#f2b8a2', fog: '#f5e2c8' }
+  };
+  T.ink = {
+    night: { zenith: '#f4f1ea', horizon: '#e6e2d8', shore: '#d8d3c6', ring: '#1a1a1a',
+      light: '#5a5650', firefly: '#8a8478', gold: '#3a3a3a', dark: '#141414',
+      auroraG: '#c8c4bc', auroraP: '#bdb8b0', dawn: '#e0dcd4', fog: '#f4f1ea' },
+    day:   { zenith: '#faf8f2', horizon: '#eeeae0', shore: '#e0dbd0', ring: '#1a1a1a',
+      light: '#5a5650', firefly: '#8a8478', gold: '#3a3a3a', dark: '#141414',
+      auroraG: '#d0ccc4', auroraP: '#c8c4bc', dawn: '#e6e2d8', fog: '#faf8f2' }
+  };
+  T.tropical = {
+    night: { zenith: '#03101c', horizon: '#064a5c', shore: '#0a8a8a', ring: '#5ff0ff',
+      light: '#eafcff', firefly: '#b8ff7a', gold: '#ffc34a', dark: '#062a22',
+      auroraG: '#3fe0c0', auroraP: '#5a7ad8', dawn: '#ffb08a', fog: '#d8ffff' },
+    day:   { zenith: '#3a9ad0', horizon: '#9fe0f0', shore: '#20b0b8', ring: '#a0ffff',
+      light: '#ffffff', firefly: '#b8ff7a', gold: '#ffc34a', dark: '#0a3a2a',
+      auroraG: '#3fe0c0', auroraP: '#5a7ad8', dawn: '#ffc8a8', fog: '#e8ffff' }
+  };
+  LQ.themeList = ['night', 'winter', 'autumn', 'ink', 'tropical'];
+
+  // ---------- Pools de partículas ----------
+  const SNOW_MAX = 90, LEAF_MAX = 28, STROKE_MAX = 40, BIO_MAX = 120;
+  const snow = [], leaves = [], strokes = [], bio = [];
+  for (let i = 0; i < SNOW_MAX; i++) snow.push({ x: 0, y: 0, vx: 0, vy: 0, r: 1, ph: 0, a: 0 });
+  for (let i = 0; i < LEAF_MAX; i++) leaves.push({ x: 0, y: 0, vx: 0, vy: 0, rot: 0, vr: 0, w: 6, h: 3, ph: 0, water: false, bob: 0, c: 0, alive: false });
+  for (let i = 0; i < STROKE_MAX; i++) strokes.push({ active: false, x: 0, y: 0, age: 0, seed: 0 });
+  for (let i = 0; i < BIO_MAX; i++) bio.push({ active: false, x: 0, y: 0, ang: 0, age: 0, life: 1, rad: 0 });
+  let strokeCur = 0, bioCur = 0, leafTimer = 0;
+  const LEAF_COLORS = ['#b8452a', '#d0642e', '#a83a2a', '#c8863a', '#8a2e22'];
+
+  let theme = 'night', ready = false;
+  let themeAt = -1e9; // game.t da última troca: entidades do tema entram em fade (§3, "nunca pop")
+  function themeFade(game){ return game.ease.smoothstep((game.t - themeAt) / 5); }
+
+  function cap(n, game){ return game.eco ? Math.floor(n * 0.5) : n; }
+
+  // ---------- Neve (inverno) ----------
+  function resetFlake(f, game, top){
+    f.x = game.rand() * (game.W + 40) - 20;
+    f.y = top ? -4 : game.rand() * game.H;
+    f.vy = 14 + game.rand() * 26; f.vx = 0;
+    f.r = 0.8 + game.rand() * 1.4; f.ph = game.rand() * 6.28;
+    f.a = 0.35 + game.rand() * 0.45;
+  }
+  function updateSnow(dt, game){
+    const n = cap(SNOW_MAX, game), wind = game.has('wind') ? 8 : 3;
+    for (let i = 0; i < n; i++){
+      const f = snow[i];
+      f.ph += dt; f.y += f.vy * dt; f.x += (Math.sin(f.ph * 1.3) * 6 + wind) * dt;
+      if (f.y > game.H + 4 || f.x > game.W + 30) resetFlake(f, game, true);
+    }
+  }
+  function drawSnow(ctx, game){
+    const n = cap(SNOW_MAX, game);
+    ctx.fillStyle = game.palette.light;
+    const tf = themeFade(game);
+    for (let i = 0; i < n; i++){
+      const f = snow[i];
+      // flocos sobre a água ficam mais fracos (quase derretendo)
+      ctx.globalAlpha = (f.y > game.horizonY ? f.a * 0.5 : f.a) * tf;
+      ctx.fillRect(f.x - f.r, f.y - f.r, f.r * 2, f.r * 2);
+    }
+    ctx.globalAlpha = 1;
+  }
+  // gelo fino nas bordas: 2 polígonos claros junto à margem
+  function drawIce(ctx, game){
+    const W = game.W, H = game.H, tf = themeFade(game);
+    ctx.fillStyle = game.palette.light;
+    ctx.globalAlpha = 0.07 * tf;
+    ctx.beginPath(); ctx.moveTo(0, H); ctx.lineTo(0, H - 70); ctx.quadraticCurveTo(W * 0.12, H - 55, W * 0.22, H); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(W, H); ctx.lineTo(W, H - 55); ctx.quadraticCurveTo(W * 0.9, H - 40, W * 0.8, H); ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 0.12 * tf;
+    ctx.beginPath(); ctx.moveTo(0, H - 70); ctx.quadraticCurveTo(W * 0.12, H - 55, W * 0.22, H); ctx.lineWidth = 1; ctx.strokeStyle = game.palette.light; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(W, H - 55); ctx.quadraticCurveTo(W * 0.9, H - 40, W * 0.8, H); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------- Folhas (outono) ----------
+  function spawnLeaf(game, onWater){
+    let l = null;
+    for (let i = 0; i < LEAF_MAX; i++) if (!leaves[i].alive){ l = leaves[i]; break; }
+    if (!l) return;
+    l.alive = true; l.x = game.rand() * game.W;
+    l.y = onWater ? game.horizonY + 10 + game.rand() * (game.H - game.horizonY - 20) : -6;
+    l.water = onWater; l.vx = 0; l.vy = onWater ? 0 : 18 + game.rand() * 20;
+    l.rot = game.rand() * 6.28; l.vr = (game.rand() - 0.5) * 2;
+    l.w = 5 + game.rand() * 4; l.h = l.w * 0.5; l.ph = game.rand() * 6.28; l.bob = 0;
+    l.c = Math.floor(game.rand() * LEAF_COLORS.length);
+  }
+  function updateLeaves(dt, game){
+    leafTimer -= dt;
+    const target = cap(LEAF_MAX, game);
+    if (leafTimer <= 0){ leafTimer = 2 + game.rand() * 4; let alive = 0; for (const l of leaves) if (l.alive) alive++; if (alive < target) spawnLeaf(game, false); }
+    const wind = game.has('wind') ? 10 : 4;
+    for (const l of leaves){
+      if (!l.alive) continue;
+      l.ph += dt;
+      if (!l.water){
+        l.y += l.vy * dt; l.x += (Math.sin(l.ph * 1.1) * 14 + wind) * dt; l.rot += l.vr * dt;
+        // toca a água: passa a flutuar (anel fraquinho, sem som)
+        if (l.y > game.horizonY + 8 + (l.x / game.W) * (game.H - game.horizonY) * 0.9){
+          l.water = true; l.vy = 0; l.vr *= 0.2;
+          game.spawnRipple(l.x, l.y, { strength: 0.3, rings: 1 });
+        }
+      } else {
+        l.vx *= (1 - 1.5 * dt); l.vy *= (1 - 1.5 * dt);
+        l.x += (l.vx + Math.sin(l.ph * 0.4) * 3 + wind * 0.15) * dt; l.y += l.vy * dt;
+        l.rot += l.vr * dt; l.bob *= (1 - 2.5 * dt);
+        if (l.x > game.W + 20 || l.x < -20 || l.y > game.H + 10 || l.y < game.horizonY) l.alive = false;
+      }
+    }
+  }
+  function drawLeaves(ctx, game){
+    const tf = themeFade(game);
+    for (const l of leaves){
+      if (!l.alive) continue;
+      const y = l.y + (l.water ? Math.sin(l.ph * 5) * l.bob : 0);
+      ctx.fillStyle = LEAF_COLORS[l.c];
+      ctx.globalAlpha = (l.water ? 0.8 : 0.9) * tf;
+      ctx.save(); ctx.translate(l.x, y); ctx.rotate(l.rot);
+      ctx.beginPath(); ctx.ellipse(0, 0, l.w, l.water ? l.h * 0.55 : l.h, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  }
+  function pushLeaves(x, y, game){
+    for (const l of leaves){
+      if (!l.alive || !l.water) continue;
+      const dx = l.x - x, dy = (l.y - y) / 0.35, d = Math.sqrt(dx * dx + dy * dy);
+      if (d > 160 || d < 1) continue;
+      const k = (1 - d / 160) * 40;
+      l.vx += dx / d * k; l.vy += dy / d * k * 0.35; l.vr += (game.rand() - 0.5) * 1.5; l.bob = 2.5 * (1 - d / 160);
+    }
+  }
+
+  // ---------- Pinceladas (tinta) ----------
+  function addStroke(x, y, game){
+    const s = strokes[strokeCur]; strokeCur = (strokeCur + 1) % STROKE_MAX;
+    s.active = true; s.x = x; s.y = y; s.age = 0; s.seed = game.rand() * 100;
+  }
+  function updateStrokes(dt){
+    for (const s of strokes){ if (!s.active) continue; s.age += dt; if (s.age > 1.8) s.active = false; }
+  }
+  // anel como pincelada: segmentos com lineWidth variável e falhas (pincel seco)
+  function drawStrokes(ctx, game){
+    ctx.strokeStyle = game.palette.ring; ctx.lineCap = 'round';
+    const SEG = 14;
+    for (const s of strokes){
+      if (!s.active) continue;
+      const f = 1 - s.age / 1.8, rad = s.age * 60;
+      if (rad < 2) continue;
+      const alpha = 0.85 * f * f;
+      if (alpha < 0.02) continue;
+      ctx.globalAlpha = alpha;
+      for (let i = 0; i < SEG; i++){
+        const a0 = i / SEG * Math.PI * 2, a1 = (i + 1) / SEG * Math.PI * 2;
+        const wv = Math.sin(a0 * 3 + s.seed) * 0.5 + 0.5;
+        if (wv < 0.18 && s.age > 0.5) continue; // falha de tinta
+        ctx.lineWidth = (0.6 + wv * 3.2) * (0.5 + 0.5 * f);
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y, rad, rad * 0.35, 0, a0, a1);
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1; ctx.lineWidth = 1.5; ctx.lineCap = 'butt';
+  }
+
+  // ---------- Bioluminescência (tropical) ----------
+  function addBio(x, y, game){
+    const n = cap(14, game);
+    for (let k = 0; k < n; k++){
+      const b = bio[bioCur]; bioCur = (bioCur + 1) % BIO_MAX;
+      b.active = true; b.x = x; b.y = y; b.ang = game.rand() * Math.PI * 2;
+      b.age = 0; b.life = 0.9 + game.rand() * 1.1; b.rad = 0.4 + game.rand() * 0.6;
+    }
+  }
+  function updateBio(dt){
+    for (const b of bio){ if (!b.active) continue; b.age += dt; if (b.age > b.life) b.active = false; }
+  }
+  function drawBio(ctx, game){
+    const sp = game.sprite.glow('#3fd8ff', 10);
+    for (const b of bio){
+      if (!b.active) continue;
+      const k = b.age / b.life, r = b.age * 60 * b.rad;
+      const x = b.x + Math.cos(b.ang) * r, y = b.y + Math.sin(b.ang) * r * 0.35;
+      ctx.globalAlpha = 0.55 * Math.sin(Math.PI * k) * (k < 1 ? 1 : 0);
+      const sz = 8 + 10 * k;
+      ctx.drawImage(sp, x - sz, y - sz, sz * 2, sz * 2);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------- Achievements (§8) não cobertos pelo núcleo ----------
+  // Núcleo já dá: first_stone, woke_someone, clear_view, aurora, just_watching, accidental_melody, left_light_on, thousand_ripples.
+  // golden_fish/night_bloom: ent/fish.js e ent/lilies.js; full_moon/until_dawn: ent/sky.js.
+
+  // ---------- Troca de tema ----------
+  function applyTheme(name, game){
+    theme = LQ.themeList.indexOf(name) >= 0 ? name : 'night';
+    themeAt = ready ? game.t : -1e9; // no init entra pronto; troca em jogo faz fade de 5 s
+    game.lightBlend = theme === 'ink' ? 'multiply' : 'lighter'; // glows em papel claro: escurecem em vez de lavar
+    game.audio.setTheme(theme);
+    game.hideCoreRipples = theme === 'ink'; // tinta: pinceladas substituem os anéis do núcleo
+    document.body.classList.remove('theme-night', 'theme-winter', 'theme-autumn', 'theme-ink', 'theme-tropical');
+    document.body.classList.add('theme-' + theme);
+    // ícones da UI acompanham a tinta (tema claro)
+    document.documentElement.style.setProperty('--ico', theme === 'ink' ? '#1a1a1a' : '#e9f2ff');
+    if (theme === 'winter') for (let i = 0; i < SNOW_MAX; i++) resetFlake(snow[i], game, false);
+    if (theme === 'autumn'){ for (const l of leaves) l.alive = false; for (let i = 0; i < 8; i++) spawnLeaf(game, true); }
+    for (const s of strokes) s.active = false;
+    for (const b of bio) b.active = false;
+  }
+
+  LQ.register('themes', {
+    init(game){
+      applyTheme(game.state.theme, game);
+      ready = true;
+    },
+    onTheme(name, game){ applyTheme(name, game); },
+    update(dt, game){
+      if (!ready) return;
+      if (game.state.theme !== theme) applyTheme(game.state.theme, game);
+      if (theme === 'winter') updateSnow(dt, game);
+      else if (theme === 'autumn') updateLeaves(dt, game);
+      else if (theme === 'ink') updateStrokes(dt);
+      else if (theme === 'tropical') updateBio(dt);
+    },
+    onRipple(x, y, game){
+      if (theme === 'autumn') pushLeaves(x, y, game);
+      else if (theme === 'ink') addStroke(x, y, game);
+      else if (theme === 'tropical') addBio(x, y, game);
+    },
+    draw(layer, ctx, game){
+      if (theme === 'winter'){
+        if (layer === 'lilies') drawIce(ctx, game);
+        else if (layer === 'fog') drawSnow(ctx, game);
+      } else if (theme === 'autumn'){
+        if (layer === 'lilies') drawLeaves(ctx, game);
+      } else if (theme === 'ink'){
+        if (layer === 'ripples') drawStrokes(ctx, game);
+      } else if (theme === 'tropical'){
+        if (layer === 'light') drawBio(ctx, game); // eco: metade das partículas (cap)
+      }
+    }
+  });
+})();
+
+</script>
+<script>LQ.start();</script>

@@ -4,7 +4,8 @@
 > Status atual sempre na seção **Agora**.
 
 ## Agora
-- **Fase atual:** 4 — Publicação ✅ **JOGO NO AR: https://allbele.github.io/lago-quieto/** · Fase 5 (Steam/Electron) a iniciar
+- **JOGO NO AR:** **https://allbele.github.io/lago-quieto/** · espelho Artifact: https://claude.ai/code/artifact/1211e100-54e0-4a88-8caf-2f0dd2c8e307
+- **Fase atual:** 5 — Steam (Electron wrapper + achievements + material de loja + scripts steamcmd) — *em execução*
 - **Jogo:** **Lago Quieto** (*Quiet Lake*) — "Jogue uma pedra. O lago faz o resto." · slug `lago-quieto`
 - **Você precisa fazer:** nada.
 - **Próximo entregável:** pacote Electron + material de loja Steam em `steam/` e `store/` (não depende de você até ter a conta Steamworks).
@@ -31,6 +32,9 @@
 - **Fase 3 iniciada:** workflow `lago-quieto-test`.
 - **Fase 3 concluída (26/08, 30 agentes, ~1,3M tokens, 57 min).** 3 testadores (primeira vez / stress / direção de arte) → 25 achados → 22 verificações céticas → 12 confirmados e corrigidos: save em array/tipos errados, `LQ.reset()`, barra não some com cursor sobre ela, temas entram em fade (sem pop), tema tinta com lua/vagalumes em grafite, vagalumes só pousam na fase 6, peixes/sapo/lírios reposicionam no resize, lírios evitam a barra de ícones, aurora mais borrada e tênue. 8 screenshots 1280×720 em `store/screenshots/`.
 - **Fase 4 concluída (26/08).** Repo público `https://github.com/allbele/lago-quieto` (branch main). GitHub Pages só serve `/` ou `/docs` → raiz com `index.html` redirecionando para `web/` + `.nojekyll`. Publicado em **https://allbele.github.io/lago-quieto/** (ativo 50 s após o push). `scripts/deploy-pages.sh` republica com um comando.
+- **Verificação pós-publicação (26/08):** aberto no Chrome em https://allbele.github.io/lago-quieto/ — redireciona para `web/`, pedras caem, anéis formam, console sem erros.
+- **Espelho Artifact publicado:** bundle de arquivo único (`store/bundle/lago-quieto.html`, 127 KB, CSS+JS inline) em https://claude.ai/code/artifact/1211e100-54e0-4a88-8caf-2f0dd2c8e307 (privado; compartilhável pelo menu da página).
+- **Fase 5 iniciada:** workflow `lago-quieto-steam` — 3 construtores (Electron+steamworks.js, material de loja/capsules, vdf+steamcmd+checklist Steamworks) + 1 verificador que abre o .app no Mac.
 - Este diário criado a pedido do usuário: "salva em um .md também, atualizado dinamicamente, com lembranças do que já foi, por onde passou".
 
 ---
