@@ -5,7 +5,7 @@
 
 ## Agora
 - **JOGO NO AR:** **https://allbele.github.io/lago-quieto/** · espelho Artifact: indisponível (dois links sumiram logo após publicar; investigar depois — não bloqueia nada)
-- **Fase atual:** 6 concluída ✅ — **Modo ⚡ Idle publicado** junto com o 🌙 Zen em https://allbele.github.io/lago-quieto/ (tela de escolha na abertura). Steam segue aguardando a conta do usuário.
+- **Fase atual:** 7 — **Idle v2** (loja legível com nomes/descrições/marcos, populações que crescem com as compras, 4 tipos de clique bônus) — *em execução*. Plano em `PLANO-IDLE-V2.md`. Steam segue aguardando a conta.
 - **Jogo:** **Lago Quieto** (*Quiet Lake*) — "Jogue uma pedra. O lago faz o resto." · slug `lago-quieto`
 - **Você precisa fazer:** nada.
 - **Próximo entregável:** upload para a Steam — só depois de você criar a conta Steamworks e me passar o App ID / Depot IDs.
@@ -44,6 +44,8 @@
 - **26/08 · Workflow B2 concluído (7 agentes, ~40 min).** `web/idle/`: util (fmt/cost/max), state (migração), engine (rate, compras x1/x10/max, marcos ×2 automáticos, auto-clique, offline com teto, relógio de parede, anéis automáticos ≤3/s sem contar ripple), hud (HUD topo-esquerdo, loja lateral 260 px com blur, floaters "+N", toast de boas-vindas, dica pulsante da loja na 1ª vez), prestige (sinos, reset, tinta por run, rotação de temas). Lírio/sapo emitem impact. Steam: cloud com 2 arquivos (preload/main/steam.js), achievements do idle mapeados. Integrador confirmou no Chrome headless: cada 1º gerador acorda o morador certo, offline 10 min creditado, prestígio completo, zen intocado, 60 FPS. 19 achados de revisão aplicados.
 - **26/08 · Workflow C concluído (24 agentes, 43 min).** 18 achados → 10 confirmados e corrigidos: botão de modo pede 2 cliques (evita troca acidental) e não credita tempo do zen como offline; aurora repintada a 15 Hz (23→60 FPS em 2560×1440); tema tinta com loja legível; mobile ≤600 px; `cur=Infinity` clampado a 1e300; rotação de temas no 5º prestígio; dica da loja solta a barra após 10 s; favicon 404 removido. Screenshots 09-12 do idle, bundle único regenerado (196 KB), build Mac refeito e aberto (tela de escolha confirmada), textos de loja PT/EN e README com "Dois modos".
 - **Publicado (26/08):** push para `allbele/lago-quieto` → GitHub Pages; novo Artifact espelho (o anterior havia sido apagado).
+- **26/08 · Feedback do usuário após jogar o idle:** "passaria um tempo igual o Cookie Clicker", mas a loja é ilegível (não dá pra saber o que cada item muda), faltam cliques bônus, e poucos peixes — populações deveriam crescer com as evoluções; ideia de peixes comerem as pedras/ração. Decisões: nome + frase curta + card de marcos; só PT-BR; os 4 bônus (peixe come a pedra, brilho dourado, combo de ritmo, reflexo de cadente). **Regra permanente: sem Artifacts do Claude** (usuário apagou de propósito; tudo via CLI/GitHub).
+- **26/08 · Tropeço de processo:** o 1º workflow do Idle v2 rodou com o "modo de planejamento" ainda ativo → 9 agentes só escreveram planos (código pronto em `scripts/planos-agentes/`), nenhum arquivo do jogo mudou. Saída formal do plan mode e relançamento (`lq-idle-v2-apply`) aplicando esses planos + 8 correções cruzadas (fórmula de população sem salto na 1ª compra, onResize, stats.bonuses, peixe come a pedra com janela 2,2 s, hooks de teste, lakePoint fora da loja).
 - Este diário criado a pedido do usuário: "salva em um .md também, atualizado dinamicamente, com lembranças do que já foi, por onde passou".
 
 ---
