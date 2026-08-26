@@ -14,6 +14,6 @@ else
   git push -u origin main
 fi
 # Ativa Pages servindo /web da branch main
-gh api -X POST "repos/$REPO/pages" -f 'source[branch]=main' -f 'source[path]=/web' >/dev/null 2>&1 \
-  || gh api -X PUT "repos/$REPO/pages" -f 'source[branch]=main' -f 'source[path]=/web' >/dev/null
+gh api -X POST "repos/$REPO/pages" -f 'source[branch]=main' -f 'source[path]=/' >/dev/null 2>&1 \
+  || gh api -X PUT "repos/$REPO/pages" -f 'source[branch]=main' -f 'source[path]=/' >/dev/null
 echo "Pages: https://allbele.github.io/lago-quieto/"
