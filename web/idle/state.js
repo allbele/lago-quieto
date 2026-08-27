@@ -41,6 +41,10 @@ LQ.IdleState = (function(){
     out.prest.mult = 1 + 0.1 * out.prest.pts; // derivado: nunca confia no save
     const goalIds = D.goals.map(g => g.id);
     out.goals = Array.isArray(s.goals) ? Array.from(new Set(s.goals.filter(x => idOk(x) && goalIds.indexOf(x) >= 0))) : [];
+    // save sem `goals` (ou goals:[] com progresso real): as metas já cumpridas são marcadas em silêncio
+    // pelo motor no init (sem toast 'Meta:' em rajada). Flag transitória — o motor a apaga; nunca vai ao save.
+    const hasGens = !!(s.gens && typeof s.gens === 'object' && Object.keys(out.gens).some(k => out.gens[k] > 0));
+    if (!Array.isArray(s.goals) || (s.goals.length === 0 && out.life > 0 && hasGens)) out.silentGoals = true;
     out.lastTick = pos(s.lastTick);
     // era: recalculada de life (save v1 não tinha); nunca menor que a gravada
     out.era = Math.max(Math.min(int(s.era), Math.max(0, ((D.eras || []).length || 1) - 1)), eraFor(out.life));

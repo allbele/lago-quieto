@@ -21,6 +21,7 @@ window.LQ = window.LQ || {};
   let paths = null;           // Path2D cacheados por tamanho
   let lastObj = null, origOverride = null, dawnOn = false;
   let splitMode = false;      // loja embaixo (--shop-h > 0) ou lago baixo: lanterna sobe para não ficar atrás dos toasts
+  let prestBound = false;    // assinatura única de LQ.Idle.on('prestige')
   let woodFor = '', wood = '#3a2a1c'; // tom de madeira (píer/barco) derivado de palette.dark, cacheado por cor
 
   const isIdle = () => !!(game && game.mode === 'idle' && LQ.Idle);
@@ -264,10 +265,17 @@ window.LQ = window.LQ || {};
     ctx.globalAlpha = 1;
   }
 
+  // prestígio: o motor zera os buffs (clearBuffs) — a lanterna apaga junto (buff, brilho e cooldown), já durante os sinos
+  function clearLantern(){ buffUntil = -1; lit = 10; cooldown = 0; }
+  function bindPrestige(){
+    if (prestBound || !LQ.Idle || typeof LQ.Idle.on !== 'function') return;
+    LQ.Idle.on('prestige', clearLantern); prestBound = true;
+  }
   const def = {
     init(g){
       game = g; paths = null; fadeAt = {}; birds = []; birdsT = 0; flash = 10; lit = 10; cooldown = 0; buffUntil = -1;
       if (!isIdle()){ shownEra = -1; return; }
+      bindPrestige();
       shownEra = era();
       build();
       installOverride();
@@ -277,6 +285,8 @@ window.LQ = window.LQ || {};
     update(dt, g){
       if (!isIdle()) return;
       if (g.W !== lastW || g.H !== lastH) build();
+      if (!prestBound) bindPrestige(); // LQ.Idle pode ter sido registrado depois deste arquivo
+      if (LQ.IdlePrestige && LQ.IdlePrestige.busy && (buffUntil >= 0 || lit < LIT_T || cooldown > 0)) clearLantern();
       const e = era(); if (e < 0) return;
       if (e > shownEra){
         // completou a era: flash, sino (grau = era) e peças novas em fade de 8 s
@@ -317,6 +327,6 @@ window.LQ = window.LQ || {};
       return true;
     },
     era, flock,
-    state(){ return { era: era(), shownEra, progress: progress(), nodes: nodes(), lit: lit < LIT_T, cooldown, flash: flash < FLASH_T, buffOn: !!game && game.t < buffUntil, birds: birds.length, dawn: dawnOn, fading: Object.keys(fadeAt).filter(k => pieceK(+k) < 1).map(Number) }; }
+    state(){ return { era: era(), shownEra, progress: progress(), nodes: nodes(), lit: lit < LIT_T, cooldown, flash: flash < FLASH_T, buffOn: !!game && game.t < buffUntil && !(LQ.IdlePrestige && LQ.IdlePrestige.busy), birds: birds.length, dawn: dawnOn, fading: Object.keys(fadeAt).filter(k => pieceK(+k) < 1).map(Number) }; }
   };
 })();

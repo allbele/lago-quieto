@@ -290,6 +290,12 @@ LQ.Idle = (function(){
       default: return false;
     }
   }
+  // marca em silêncio (sem emit 'goal') as metas já cumpridas — save antigo sem `goals` (flag de idle/state.js)
+  function silentGoals(){
+    const s = S(); if (!s || !s.silentGoals) return;
+    delete s.silentGoals;
+    for (const gl of D().goals) if (s.goals.indexOf(gl.id) < 0 && goalMet(gl)) s.goals.push(gl.id);
+  }
   function checkGoals(){
     const s = S(); if (!s) return;
     for (const gl of D().goals){
@@ -303,7 +309,7 @@ LQ.Idle = (function(){
   // ---------- Entidade ----------
   let goalTimer = 0, ringAcc = 0;
   LQ.register('idle-engine', {
-    init(g){ game = g; invalidate(); frozenGens = null; clearBuffs(); if (g.mode !== 'idle') return; const s = S(); if (s){ s.lastTick = Date.now(); if (s.era === undefined) s.era = 0; s.era = Math.max(s.era, era()); } applyMilestones(); syncStoneStyle(); },
+    init(g){ game = g; invalidate(); frozenGens = null; clearBuffs(); if (g.mode !== 'idle') return; const s = S(); if (s){ s.lastTick = Date.now(); if (s.era === undefined) s.era = 0; s.era = Math.max(s.era, era()); } applyMilestones(); syncStoneStyle(); silentGoals(); },
     update(dt, g){
       if (g.mode !== 'idle') return; const s = S(); if (!s) return;
       tickBuffs(dt);

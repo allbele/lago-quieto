@@ -5,7 +5,7 @@
 
 ## Agora
 - **JOGO NO AR:** **https://allbele.github.io/lago-quieto/** · espelho Artifact: indisponível (dois links sumiram logo após publicar; investigar depois — não bloqueia nada)
-- **Fase atual:** 8 concluída ✅ — **Idle v3 "A Margem que Acende" publicado** em https://allbele.github.io/lago-quieto/ . Pendente leve: rodada extra de testes humanos/screenshots 17-20 (W3 falhou 2× por instabilidade da API/sono do Mac; W2 já validou 12/12). Steam segue aguardando a conta do usuário.
+- **Fase atual:** 8 concluída ✅ — **Idle v3 "A Margem que Acende" publicado** em https://allbele.github.io/lago-quieto/ . Rodada enxuta pós-publicação feita: 3 achados baixos corrigidos, screenshots 17-20 gerados. Steam segue aguardando a conta do usuário.
 - **Jogo:** **Lago Quieto** (*Quiet Lake*) — "Jogue uma pedra. O lago faz o resto." · slug `lago-quieto`
 - **Você precisa fazer:** nada.
 - **Próximo entregável:** upload para a Steam — só depois de você criar a conta Steamworks e me passar o App ID / Depot IDs.
@@ -55,6 +55,7 @@
 - **26/08 · W2 build v3 concluído (8 agentes, 70 min, 17 achados corrigidos).** Loja fixa 360 px (28vw) que reserva largura do canvas (lua visível), cabeçalho com total/taxa/"+N por pedra (X%)", x1/x10/x100/max, abas Moradores/Melhorias, linhas com produção total e por unidade, marcos inline; split vertical em telas estreitas. Eras com peças na margem (lanterna, píer, barco+aldeia, ponte+templo, amanhecer) + Linha da Margem; lanterna pastoreável (fuga desloca a base, janela de pastoreio 10 s, só acende por cliques do jogador; +25% 60 s); anéis automáticos não movem bichos; toasts empilhados (3) com sinos; falatório (1ª frase ~90 s); painel Margem (eras/metas/moradores). Economia: clickShare 41% aos 3 min no teste real; bônus do peixe contido (cooldown 6 s, 1 s de taxa). Bug pego pelo integrador: peças re-entravam em fade a cada load (era lida antes do motor). Commit local.
 - **27/08 02:10 · Mac dormiu de novo** (tampa fechada vence `caffeinate -i`); W3 v3 morreu com 0/5 concluídos, nada parcial no disco. Retomado às 02:10 com `caffeinate -dims`. Lição: usar `-dims` (e/ou manter a tampa aberta) em workflows longos.
 - **27/08 07:30-08:40 · W3 v3 falhou pela 2ª vez** (agentes "estagnados": API instável — o classificador da extensão Chrome também estava fora — e build Electron >10 min). Decisão: publicar o que o W2 validou. Feito à mão: bundle regenerado (323 KB com shore/toasts/chatter), build Mac refeito, textos PT/EN/README v3 (já alterados pelo agente antes de cair) conferidos, smoke tests headless T2/T3/T5 (zen intacto, layout reservado, 5 eras, console limpo). **Push realizado.**
+- **27/08 · Rodada enxuta (2 agentes) + corretor:** screenshots 17-20 (loja Era 1, lanterna acesa, Lago Lendário, Amanhecer com Margem) sem erros; 3 achados baixos corrigidos — toasts × painel Margem no layout dividido, save antigo sem `goals` marcava metas em silêncio (sem enxurrada de toasts), lanterna apagava no prestígio. Bundle regenerado e republicado.
 - Este diário criado a pedido do usuário: "salva em um .md também, atualizado dinamicamente, com lembranças do que já foi, por onde passou".
 
 ---
