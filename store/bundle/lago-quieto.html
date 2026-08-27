@@ -7,11 +7,13 @@
 html,body{width:100%;height:100%;overflow:hidden;background:#050914;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
 body.nocursor,body.nocursor *{cursor:none!important}
 
-#lake{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+/* Área do lago: o canvas ocupa tudo menos a reserva da loja idle (--shop-w à direita / --shop-h embaixo; 0 em zen) */
+:root{--shop-w:0px;--shop-h:0px}
+#lake{position:fixed;top:0;left:0;width:calc(100% - var(--shop-w));height:calc(100% - var(--shop-h));display:block;touch-action:none}
 
 /* Barra inferior: até 7 botões (som, tela cheia, tema, coleção, eco, modo, loja) */
 :root{--ico:#e9f2ff;--ico-size:40px;--ui-gap:clamp(6px,2vw,14px);--ui-pad:calc(10px + env(safe-area-inset-bottom,0px))}
-#ui{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;align-items:center;gap:var(--ui-gap);
+#ui{position:fixed;left:0;right:var(--shop-w);bottom:var(--shop-h);display:flex;justify-content:center;align-items:center;gap:var(--ui-gap);
   padding:6px clamp(4px,2vw,16px) var(--ui-pad);flex-wrap:nowrap;
   pointer-events:none;opacity:1;transform:none;will-change:opacity;transition:opacity 1s ease}
 body.uihidden #ui{opacity:0}
@@ -30,12 +32,10 @@ body.muted #btn-sound .off{display:inline}
 body.eco #btn-eco{opacity:1}
 /* Modo: 1º clique arma (aceso) por 2 s; 2º clique troca */
 #btn-mode.arm{opacity:1;animation:hint 1s ease-in-out infinite}
-/* Idle: dica de descoberta da loja (até a 1ª abertura, quando há algo comprável) */
-#btn-shop.hint{animation:hint 1.6s ease-in-out infinite}
 @keyframes hint{50%{opacity:1;transform:scale(1.15)}}
 
 /* Coleção: faixa dos moradores acordados, logo acima da barra (não sobrepõe) */
-#collection{position:fixed;left:0;right:0;bottom:calc(var(--ui-pad) + var(--ico-size) + 18px);display:flex;justify-content:center;align-items:center;
+#collection{position:fixed;left:0;right:var(--shop-w);bottom:calc(var(--shop-h) + var(--ui-pad) + var(--ico-size) + 18px);display:flex;justify-content:center;align-items:center;
   gap:clamp(8px,2.5vw,16px);flex-wrap:wrap;padding:0 clamp(8px,3vw,24px);
   pointer-events:none;opacity:0;transform:translateY(6px);transition:opacity .8s ease,transform .8s ease}
 #collection.open{opacity:1;transform:none}
@@ -47,8 +47,17 @@ body.uihidden #collection{opacity:0;transform:translateY(6px)}
 /* IDLE */
 :root{--gold:#e8b04a}
 body.theme-ink{--gold:#7a4f00} /* dourado legível sobre papel (≥4.5:1) */
+/* Reserva da loja (só idle): landscape ≥900px → coluna à direita 360px (340-380); estreito ou retrato → tela dividida
+   (lago em cima ≥55% da altura e ≥300px; loja embaixo). Zen: 0 (não há loja). */
+body.mode-idle{--shop-w:clamp(340px,28vw,380px);--shop-h:0px}
+@media (max-width:899px),(orientation:portrait){
+  body.mode-idle{--shop-w:0px;--shop-h:max(0px,min(45vh,calc(100vh - 300px)))}
+}
+body.mode-zen{--shop-w:0px;--shop-h:0px}
+
+/* HUD pequeno no canto do lago: anel + arco de combo · taxa · ×combo (o total vive no cabeçalho da loja) */
 #hud{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:14px;display:none;align-items:baseline;gap:6px;
-  font:15px/1 system-ui,sans-serif;font-variant-numeric:tabular-nums;color:var(--ico,#e9f2ff);
+  font:13px/1 system-ui,sans-serif;font-variant-numeric:tabular-nums;color:var(--ico,#e9f2ff);
   pointer-events:none;opacity:.9;transition:opacity 1s ease}
 body.mode-idle #hud{display:flex}
 body.uihidden #hud{opacity:.5}
@@ -60,102 +69,181 @@ body.uihidden #hud{opacity:.5}
 #hud .combo.on{opacity:.9}
 #hud .combo.hot{stroke:var(--gold)}
 #hud .combo circle{transition:stroke-dasharray .15s ease}
-#hud .rate{font-size:12px;opacity:.55}
-#hud .cmul{font-size:11px;color:var(--gold);opacity:.9}
+#hud .rate{font-size:12px;opacity:.7}
+#hud .cmul{font-size:12px;color:var(--gold);opacity:.95}
 #hud .cmul:empty{display:none}
 #hud .toast{position:absolute;left:0;top:26px;display:flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap;
   opacity:0;transform:translateY(-4px);transition:opacity .8s ease,transform .8s ease}
 #hud .toast.show{opacity:.95;transform:none}
 #hud .toast .ico{display:inline-flex;line-height:0}
 #hud .toast svg{width:14px;height:14px}
+/* pilha de toasts: bloco TOASTS no fim do arquivo */
 
-#shop{position:fixed;top:0;right:0;bottom:0;width:300px;max-width:100%;display:none;flex-direction:column;gap:10px;
-  padding:calc(12px + env(safe-area-inset-top,0px)) 12px calc(var(--ui-pad) + var(--ico-size) + 12px);
-  background:rgba(5,9,20,.78);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-  border-left:1px solid rgba(233,242,255,.12);overflow-y:auto;overflow-x:hidden;
-  font:12px/1.25 system-ui,sans-serif;font-variant-numeric:tabular-nums;color:var(--ico,#e9f2ff);
-  transform:translateX(100%);transition:transform .35s ease,opacity .35s ease;opacity:0;pointer-events:none}
+/* Loja: sempre visível; coluna à direita (landscape) ou faixa embaixo (split). Nunca por cima do lago. */
+#shop{position:fixed;top:0;right:0;bottom:0;width:var(--shop-w);display:none;flex-direction:column;
+  background:rgba(7,12,26,.96);border-left:1px solid rgba(233,242,255,.12);
+  font:12px/1.3 system-ui,sans-serif;font-variant-numeric:tabular-nums;color:var(--ico,#e9f2ff)}
 body.mode-idle #shop{display:flex}
-#shop.open{transform:none;opacity:1;pointer-events:auto}
+@media (max-width:899px),(orientation:portrait){
+  #shop{top:auto;left:0;right:0;bottom:0;width:auto;height:var(--shop-h);border-left:0;border-top:1px solid rgba(233,242,255,.12)}
+}
 #shop svg{fill:none;stroke:var(--ico,#e9f2ff);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 #shop button{border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:0;text-align:left}
-#shop .qty{display:flex;justify-content:flex-end;gap:10px;padding:2px 4px}
-#shop .dot{width:24px;height:24px;border-radius:50%;font-size:11px;opacity:.65;position:relative;display:inline-flex;align-items:center;justify-content:center}
-#shop .dot::before{content:"";position:absolute;inset:0;border-radius:50%;border:1px solid var(--ico,#e9f2ff);opacity:.5}
-#shop .dot.on{opacity:1}
-#shop .dot.on::before{background:var(--ico,#e9f2ff);opacity:.18}
-#shop .gens,#shop .ups{display:flex;flex-direction:column;gap:6px}
-/* linha do gerador: ícone 28px · nome + contagem · frase · barra · taxa + custo */
-#shop .gen{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:6px;cursor:pointer;opacity:.6;transition:opacity .3s ease,background .3s ease}
-#shop .gen.can{opacity:1}
+#shop [hidden]{display:none!important}
+/* cabeçalho fixo */
+#shop .sh-head{flex:0 0 auto;padding:calc(12px + env(safe-area-inset-top,0px)) 14px 8px;border-bottom:1px solid rgba(233,242,255,.1)}
+#shop .total{font-size:28px;font-weight:700;line-height:1.1;letter-spacing:-.01em}
+#shop .sh-head .rate{font-size:14px;opacity:.8;margin-top:2px}
+#shop .click{font-size:12px;color:var(--gold);margin-top:4px;min-height:1.3em}
+#shop .qty{display:flex;margin-top:10px;border:1px solid rgba(233,242,255,.2);border-radius:6px;overflow:hidden}
+#shop .seg{flex:1;height:30px;font-size:12px;text-align:center;opacity:.65;border-right:1px solid rgba(233,242,255,.14)}
+#shop .seg:last-child{border-right:0}
+#shop .seg:hover{opacity:.9}
+#shop .seg.on{opacity:1;background:rgba(233,242,255,.14);font-weight:600}
+#shop .tabs{display:flex;gap:4px;margin-top:10px}
+#shop .tab{flex:1;height:30px;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:13px;opacity:.6;border-bottom:2px solid transparent;border-radius:4px 4px 0 0}
+#shop .tab:hover{opacity:.85}
+#shop .tab.on{opacity:1;font-weight:600;border-bottom-color:var(--ico,#e9f2ff)}
+#shop .badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;font-size:11px;font-weight:700;background:var(--gold);color:#1a1206}
+#shop .badge:empty{display:none}
+/* corpo com scroll */
+#shop .sh-body{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:8px 10px;scrollbar-width:thin}
+#shop .gens{display:flex;flex-direction:column;gap:6px}
+#shop .ups{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#shop .empty{grid-column:1/-1;padding:16px 6px;text-align:center;opacity:.55;font-size:12px}
+/* linha do gerador: ícone 36 · nome 14/600 + contagem 20/700 · produz · custo + faltam · barra 4px · próximo marco · marcos */
+#shop .gen{display:flex;align-items:flex-start;gap:12px;min-height:68px;padding:10px 12px;border-radius:8px;border:1px solid transparent;cursor:pointer;opacity:.55;
+  transition:opacity .3s ease,background .3s ease,border-color .3s ease}
+#shop .gen.can{opacity:1;border-color:rgba(233,242,255,.16)}
+#shop .gen:hover{background:rgba(233,242,255,.06)}
 #shop .gen:focus-visible{outline:1px solid rgba(233,242,255,.5);outline-offset:-1px;opacity:1}
 #shop .gen:not(.can){cursor:default}
 #shop .gen.hit,#shop .up.hit{background:rgba(233,242,255,.14)}
-#shop .top .n{display:inline-block;transition:transform .25s ease}
-#shop .gen.hit .n{transform:scale(1.25)}
-#shop .gen:hover,#shop .up:hover{background:rgba(233,242,255,.06)}
-#shop .gen>svg{width:28px;height:28px;flex:0 0 auto}
-#shop .mid{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
-#shop .top,#shop .bot{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-#shop .name{font-size:12px;font-weight:600;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#shop .desc{font-size:10px;opacity:.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#shop .top .n{font-size:12px;opacity:.9}
-#shop .c{opacity:.8;display:inline-flex;align-items:center;gap:3px;white-space:nowrap}
-#shop .c svg{width:10px;height:10px;opacity:.6}
-#shop .c .q{font-size:9px;opacity:.7;margin-right:2px}
+/* morador recém-liberado pela era (30 s) */
+#shop .gen.novo{border-color:rgba(232,176,74,.5)}
+#shop .gen.novo .name::after{content:" · novo";color:var(--gold);font-size:11px;font-weight:500}
+/* telas baixas: linhas mais compactas para caber mais moradores acima da dobra */
+@media (max-height:799px){#shop .gen{min-height:56px;padding:7px 10px;gap:10px}#shop .mid{gap:3px}}
+#shop .gen>svg{width:36px;height:36px;flex:0 0 auto;margin-top:2px}
+#shop .mid{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+#shop .top{display:flex;align-items:baseline;gap:8px}
+#shop .name{flex:1;min-width:0;font-size:14px;font-weight:600;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#shop .top .n{font-size:20px;font-weight:700;line-height:1;transition:transform .25s ease}
+#shop .gen.hit .n{transform:scale(1.2)}
+#shop .chev{flex:0 0 auto;width:20px;height:20px;align-self:center;opacity:.5;display:inline-flex;align-items:center;justify-content:center;border-radius:4px}
+#shop .chev svg{width:14px;height:14px;transition:transform .2s ease}
+#shop .chev:hover{opacity:1;background:rgba(233,242,255,.1)}
+#shop .gen.exp .chev svg{transform:rotate(90deg)}
+#shop .prod{font-size:12px;opacity:.75}
+#shop .costl{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+#shop .c{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;font-size:13px;font-weight:600;opacity:.5}
+#shop .gen.can .c{opacity:1;color:var(--gold)}
+#shop .gen.can .c svg{stroke:var(--gold)}
+#shop .c svg{width:12px;height:12px;opacity:.8}
+#shop .c .q{font-size:11px;font-weight:400;opacity:.75}
 #shop .c .q:empty{display:none}
-#shop .bar{height:3px;background:rgba(233,242,255,.12);border-radius:1px;overflow:hidden}
+#shop .eta{font-size:11px;opacity:.6;white-space:nowrap}
+#shop .eta:empty{display:none}
+#shop .bar{height:4px;background:rgba(233,242,255,.12);border-radius:2px;overflow:hidden}
 #shop .bar i{display:block;height:100%;width:0;background:var(--ico,#e9f2ff);opacity:.8;transition:width .25s ease}
-#shop .per{font-size:10px;opacity:.55}
-/* upgrades: linha inteira (ícone · nome · efeito · custo) — cabe o nome sem quebrar */
-#shop .up{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;border-radius:6px;border:1px solid rgba(233,242,255,.12);opacity:.6;font-size:12px;transition:opacity .3s ease,background .3s ease}
-#shop .up.can{opacity:1}
-#shop .up svg{width:18px;height:18px;flex:0 0 auto}
-#shop .up .name{flex:1;min-width:0}
-#shop .up .fx{opacity:.7;font-size:11px}
-#shop .prest{display:inline-flex;align-items:center;justify-content:center;gap:6px;margin-top:auto;padding:8px;border-radius:6px;
-  border:1px solid rgba(233,242,255,.2);font-size:13px;opacity:.85}
+#shop .gen.can .bar i{background:var(--gold)}
+#shop .next{font-size:11px;color:var(--gold);opacity:.85;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#shop .next:empty{display:none}
+/* marcos expandidos inline (hover 250 ms ou ›) */
+#shop .ms{display:none;list-style:none;flex-direction:column;gap:3px;margin-top:4px;padding-top:6px;border-top:1px solid rgba(233,242,255,.1);font-size:11px;line-height:1.35}
+#shop .gen.exp .ms{display:flex}
+#shop .ms li{display:flex;gap:8px;align-items:baseline}
+#shop .ms .at{flex:0 0 34px;text-align:right;opacity:.75}
+#shop .ms .t{flex:1;min-width:0}
+#shop .ms .done{opacity:.45}
+#shop .ms .nxt{color:var(--gold);font-weight:600}
+#shop .ms .nxt .at{opacity:1}
+/* melhorias: cartão (ícone 36 · nome · desc 2 linhas · custo) */
+#shop .up{display:flex;flex-direction:column;gap:4px;padding:10px;border-radius:8px;border:1px solid rgba(233,242,255,.12);opacity:.55;font-size:12px;min-width:0;
+  transition:opacity .3s ease,background .3s ease,border-color .3s ease}
+#shop .up.can{opacity:1;border-color:rgba(233,242,255,.22)}
+#shop .up:hover{background:rgba(233,242,255,.06)}
+#shop .up>svg{width:36px;height:36px}
+#shop .up .name{font-size:13px;white-space:normal;line-height:1.2}
+#shop .up .desc{font-size:11px;opacity:.7;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.6em}
+#shop .up .c{margin-top:auto;font-size:12px}
+#shop .up.can .c{opacity:1;color:var(--gold)}
+#shop .up.can .c svg{stroke:var(--gold)}
+/* rodapé: prestígio + toggle do falatório */
+#shop .sh-foot{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 14px calc(8px + env(safe-area-inset-bottom,0px));border-top:1px solid rgba(233,242,255,.1)}
+#shop .prest{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:6px;border:1px solid rgba(233,242,255,.25);font-size:12px;opacity:.9}
 #shop .prest:hover{opacity:1;background:rgba(233,242,255,.06)}
-#shop .prest svg{width:18px;height:18px}
-#shop [hidden]{display:none!important}
-/* card de marcos (fora do #shop para não ser cortado pelo overflow) */
-#shop-card{position:fixed;z-index:3;width:220px;max-width:calc(100vw - 16px);padding:8px 10px;border-radius:8px;pointer-events:none;
-  background:rgba(5,9,20,.92);border:1px solid rgba(233,242,255,.18);box-shadow:0 4px 18px rgba(0,0,0,.35);
-  font:11px/1.35 system-ui,sans-serif;font-variant-numeric:tabular-nums;color:var(--ico,#e9f2ff)}
-#shop-card[hidden]{display:none}
-#shop-card .h{font-size:12px;font-weight:600;margin-bottom:2px}
-#shop-card .d{font-size:10px;opacity:.7;margin-bottom:6px}
-#shop-card .ms{list-style:none;display:flex;flex-direction:column;gap:3px}
-#shop-card .ms li{display:flex;gap:8px;align-items:baseline}
-#shop-card .ms .at{flex:0 0 34px;text-align:right;opacity:.75}
-#shop-card .ms .t{flex:1;min-width:0}
-#shop-card .ms .done{opacity:.45}
-#shop-card .ms .next{color:var(--gold);font-weight:600}
-#shop-card .ms .next .at{opacity:1}
-#shop-card .f{margin-top:6px;font-size:10px;opacity:.65}
-@media (max-width:600px){
-  #shop{width:100%;border-left:0;padding-top:calc(44px + env(safe-area-inset-top,0px));
-    mask-image:linear-gradient(to bottom,#000 calc(100% - 80px),transparent);-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 80px),transparent)} /* reserva o topo: HUD (moeda/taxa) nunca some; rodapé esmaece sob a barra */
-  #hud{z-index:2}
-}
+#shop .prest svg{width:16px;height:16px}
+#shop .chatter{margin-left:auto;display:inline-flex;align-items:center;gap:8px;font-size:11px;opacity:.75;cursor:pointer;user-select:none}
+#shop .chatter:hover{opacity:1}
+#shop .chatter input{position:absolute;opacity:0;width:0;height:0}
+#shop .chatter .sw{position:relative;width:28px;height:16px;border-radius:8px;background:rgba(233,242,255,.2);transition:background .2s ease}
+#shop .chatter .sw::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--ico,#e9f2ff);transition:transform .2s ease}
+#shop .chatter input:checked+.sw{background:var(--gold)}
+#shop .chatter input:checked+.sw::after{transform:translateX(12px)}
+#shop .chatter input:focus-visible+.sw{outline:1px solid rgba(233,242,255,.6)}
 /* Tema 'ink' (papel claro): painel claro e realces escuros, senão --ico #1a1a1a fica sobre fundo escuro */
-body.theme-ink #shop{background:rgba(236,232,224,.86);border-left-color:rgba(20,20,20,.15)}
+body.theme-ink #shop{background:rgba(236,232,224,.97);border-color:rgba(20,20,20,.15)}
+body.theme-ink #shop .sh-head,body.theme-ink #shop .sh-foot,body.theme-ink #shop .ms{border-color:rgba(20,20,20,.12)}
 body.theme-ink #shop .gen.hit,body.theme-ink #shop .up.hit{background:rgba(20,20,20,.12)}
 body.theme-ink #shop .gen:hover,body.theme-ink #shop .up:hover,body.theme-ink #shop .prest:hover{background:rgba(20,20,20,.06)}
+body.theme-ink #shop .gen.can{border-color:rgba(20,20,20,.18)}
 body.theme-ink #shop .bar{background:rgba(20,20,20,.12)}
 body.theme-ink #shop .up{border-color:rgba(20,20,20,.2)}
-body.theme-ink #shop .prest{border-color:rgba(20,20,20,.3)}
-body.theme-ink #shop .desc{opacity:.7}
-body.theme-ink #shop-card{background:rgba(240,236,228,.97);border-color:rgba(20,20,20,.2);box-shadow:0 4px 18px rgba(0,0,0,.15)}
+body.theme-ink #shop .prest,body.theme-ink #shop .qty{border-color:rgba(20,20,20,.3)}
+body.theme-ink #shop .seg{border-color:rgba(20,20,20,.2)}
+body.theme-ink #shop .seg.on{background:rgba(20,20,20,.1)}
+body.theme-ink #shop .badge{color:#fff}
+body.theme-ink #shop .chatter .sw{background:rgba(20,20,20,.2)}
+
+/* TOASTS (idle/toasts.js) — pilha inferior-esquerda dentro da área do lago (respeita --shop-w/--shop-h da loja) */
+#toasts{position:fixed;left:14px;right:calc(var(--shop-w,0px) + 14px);bottom:calc(var(--shop-h,0px) + var(--ui-pad) + var(--ico-size) + 18px);
+  display:none;flex-direction:column;align-items:flex-start;gap:6px;pointer-events:none;z-index:2;
+  font:12px/1.3 system-ui,sans-serif;font-variant-numeric:tabular-nums;color:var(--ico,#e9f2ff)}
+body.mode-idle #toasts{display:flex}
+#toasts .toast{display:flex;align-items:center;gap:8px;max-width:min(360px,100%);padding:6px 10px 6px 8px;border-radius:8px;
+  background:rgba(5,9,20,.72);border:1px solid rgba(233,242,255,.14);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+  opacity:0;transform:translateY(8px);transition:opacity .3s ease,transform .3s ease}
+#toasts .toast.show{opacity:1;transform:none}
+#toasts .toast.out{opacity:0;transform:translateY(-6px);transition:opacity .8s ease,transform .8s ease}
+#toasts .toast.act{pointer-events:auto;cursor:pointer}
+#toasts .toast.act:hover{background:rgba(5,9,20,.88);border-color:rgba(233,242,255,.3)}
+#toasts .toast .ico{flex:0 0 auto;display:inline-flex;line-height:0}
+#toasts .toast .ico svg{width:18px;height:18px;fill:none;stroke:var(--ico,#e9f2ff);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
+#toasts .toast .body{display:flex;flex-direction:column;gap:1px;min-width:0}
+#toasts .toast b{font-size:12px;font-weight:600;letter-spacing:.01em}
+#toasts .toast .txt{font-size:11px;opacity:.6}
+#toasts .toast.era{border-color:rgba(232,176,74,.45)}
+#toasts .toast.era b,#toasts .toast.goal b{color:var(--gold)}
+#toasts .toast.era .ico svg,#toasts .toast.goal .ico svg{stroke:var(--gold)}
+#toasts .toast.chatter{background:rgba(5,9,20,.55);border-color:rgba(233,242,255,.08)}
+#toasts .toast.chatter b{opacity:.7;font-weight:500}
+#toasts .toast.chatter .txt{opacity:.7;font-style:italic}
+body.theme-ink #toasts .toast{background:rgba(236,232,224,.9);border-color:rgba(20,20,20,.18)}
+body.theme-ink #toasts .toast.act:hover{background:rgba(240,236,228,.98)}
+/* Painel Margem (só idle; game.js refreshCollection): linha 1 eras, linha 2 metas, linha 3 moradores */
+body.mode-idle #collection.margem{flex-direction:column;gap:8px;padding-bottom:4px}
+#collection .mrow{display:flex;justify-content:center;align-items:center;gap:clamp(8px,2.5vw,16px);flex-wrap:wrap;pointer-events:auto}
+#collection .mrow.eras svg{width:30px;height:30px;stroke-width:1.3}
+#collection .mrow.eras svg.lock{opacity:.25;stroke-dasharray:2 2}
+#collection .mrow.eras svg.cur{opacity:1;stroke:var(--gold);animation:mpulse 2.4s ease-in-out infinite}
+#collection .mrow.goals svg{width:20px;height:20px}
+#collection .mrow.goals svg.off{opacity:.22}
+#collection .mrow.goals svg.on{opacity:.9;stroke:var(--gold)}
+#collection .msep{width:min(240px,60vw);height:1px;background:var(--ico,#e9f2ff);opacity:.12}
+#collection .mtxt{font:11px/1.3 system-ui,sans-serif;color:var(--ico,#e9f2ff);opacity:.75;text-align:center;pointer-events:auto;max-width:min(360px,90vw)}
+#collection .mrow.goals svg{pointer-events:auto;cursor:pointer}
+@keyframes mpulse{50%{opacity:.55;transform:scale(1.08)}}
 </style>
 <canvas id="lake"></canvas>
 
 <!-- Coleção: faixa com ícones dos moradores acordados (sem texto) -->
 <div id="collection" aria-hidden="true"></div>
 
-<!-- Idle: HUD (moeda/taxa) e loja lateral — preenchidos por idle/hud.js -->
+<!-- Idle: HUD (anel/combo/taxa), pilha de toasts e loja sempre visível (ao lado ou embaixo do lago) — preenchidos por idle/hud.js -->
 <div id="hud"></div>
-<aside id="shop"></aside>
+<div id="toasts" aria-live="polite"></div>
+<aside id="shop" aria-label="Loja do lago"></aside>
 
 <!-- Barra inferior de ícones -->
 <div id="ui">
@@ -179,17 +267,12 @@ body.theme-ink #shop-card{background:rgba(240,236,228,.97);border-color:rgba(20,
     <svg class="to-idle" viewBox="0 0 24 24"><path d="M13 2.5L5 13.5h6l-1 8 9-11.5h-6l1-7.5z"/></svg>
     <svg class="to-zen" viewBox="0 0 24 24"><path d="M15 3.5a9 9 0 1 0 5.5 14.5A8 8 0 0 1 15 3.5z"/></svg>
   </button>
-  <!-- Loja (só idle): anel / ondas concêntricas -->
-  <button class="ico" id="btn-shop" data-act="shop">
-    <svg viewBox="0 0 24 24"><ellipse cx="12" cy="13" rx="3" ry="1.2"/><ellipse cx="12" cy="13" rx="6.5" ry="2.6"/><ellipse cx="12" cy="13" rx="10" ry="4"/></svg>
-  </button>
 </div>
 <style>
-/* Botões de modo/loja: visibilidade por body.mode-zen / body.mode-idle */
-#btn-mode .to-zen,#btn-shop{display:none}
+/* Botão de modo: visibilidade por body.mode-zen / body.mode-idle */
+#btn-mode .to-zen{display:none}
 body.mode-idle #btn-mode .to-idle{display:none}
 body.mode-idle #btn-mode .to-zen{display:inline}
-body.mode-idle #btn-shop{display:inline-block}
 </style>
 
 <!-- Ícones dos moradores (templates para a coleção) -->
@@ -746,7 +829,8 @@ LQ.Platform = (function(){
     // modo Idle (metas de idle/data.js, prefixo idle_)
     idle_primeira_onda: 'ACH_IDLE_FIRST_WAVE', idle_vagalumes_acordam: 'ACH_IDLE_FIREFLIES', idle_cardume: 'ACH_IDLE_SCHOOL',
     idle_lua_cheia: 'ACH_IDLE_FULL_MOON', idle_mil_ondas: 'ACH_IDLE_MILLION_WAVES', idle_lago_vivo: 'ACH_IDLE_LAKE_ALIVE',
-    idle_mare_alta: 'ACH_IDLE_HIGH_TIDE', idle_nova_noite: 'ACH_IDLE_NEW_NIGHT'
+    idle_mare_alta: 'ACH_IDLE_HIGH_TIDE', idle_nova_noite: 'ACH_IDLE_NEW_NIGHT',
+    idle_guardiao_lanterna: 'ACH_IDLE_LANTERN_KEEPER', idle_tres_eras: 'ACH_IDLE_THREE_ERAS', idle_ouvinte: 'ACH_IDLE_LISTENER'
   };
 
   function localAch(){ try { return JSON.parse(localStorage.getItem(ACH_KEY) || '[]'); } catch (e) { return []; } }
@@ -849,10 +933,10 @@ window.LQ = window.LQ || {};
     const e = { name, def };
     if (i >= 0) ents[i] = e; else ents.push(e);
   };
-  function call(hook, a, b, c){
+  function call(hook, a, b, c, d){
     for (let i = 0; i < ents.length; i++){
       const f = ents[i].def[hook];
-      if (f) f.call(ents[i].def, a, b, c);
+      if (f) f.call(ents[i].def, a, b, c, d);
     }
   }
   // Hash determinístico barato (0..1) por índice inteiro — jitter estável entre frames
@@ -1054,7 +1138,8 @@ window.LQ = window.LQ || {};
     game.eco = !!game.state.eco;
     const dpr = clamp(window.devicePixelRatio || 1, 1, game.eco ? 1 : 1.5);
     game.dpr = dpr;
-    game.W = window.innerWidth; game.H = window.innerHeight;
+    // área do lago = o que o CSS reservou ao canvas (a loja idle fica ao lado/embaixo, nunca por cima)
+    game.W = Math.max(1, canvas.clientWidth || window.innerWidth); game.H = Math.max(1, canvas.clientHeight || window.innerHeight);
     game.horizonY = Math.round(game.H * 0.40);
     canvas.width = Math.round(game.W * dpr); canvas.height = Math.round(game.H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -1165,7 +1250,8 @@ window.LQ = window.LQ || {};
     r.strength = opts.strength !== undefined ? opts.strength : 1;
     r.rings = clamp(Math.round(opts.rings !== undefined ? opts.rings : (r.strength < 0.5 ? 1 : r.strength < 0.8 ? 2 : 3)) || 1, 1, 3);
     activeRipples++;
-    if (!opts.silent) call('onRipple', x, y, game); // silent: anel de bônus não acorda os moradores
+    // silent: anel de bônus não acorda os moradores; meta.auto: anel decorativo da automação (peixes/vagalumes ignoram)
+    if (!opts.silent) call('onRipple', x, y, game, { auto: !!opts.auto });
     return r;
   }
   const RING_DELAY = [0, 0.12, 0.24], RING_A0 = [1, 0.6, 0.35];
@@ -1282,7 +1368,8 @@ window.LQ = window.LQ || {};
         stones.splice(i, 1);
         if (st.dew){
           // gota de orvalho: anel menor, sem contar ripple
-          spawnRipple(st.x, st.y, { strength: 0.55, rings: 2 });
+          // idle: auto → não empurra vagalumes nem arrasta peixes (só o jogador pastoreia); zen mantém
+          spawnRipple(st.x, st.y, { strength: 0.55, rings: 2, auto: game.mode === 'idle' });
           spawnDrops(st.x, st.y, 2);
           game.audio.play('dew', { x: st.x / game.W, y: 0.5, gain: 1 });
         } else impact(st.x, st.y);
@@ -1515,7 +1602,6 @@ window.LQ = window.LQ || {};
         clearTimeout(UI.modeTimer); UI.modeArmed = false; if (b) b.classList.remove('arm');
         LQ.switchMode(game.mode === 'idle' ? 'zen' : 'idle'); return;
       }
-      else if (a === 'shop'){ game.emit('shopToggle', null); } // idle/hud.js implementa onShopToggle
       UI.applyClasses(); save();
     },
     applyClasses(){
@@ -1543,7 +1629,46 @@ window.LQ = window.LQ || {};
       for (const ic of icons){
         html += '<svg class="' + (ic === newIcon && !silent ? 'new' : '') + '"><use href="#ic-' + ic + '"/></svg>';
       }
+      // Idle: painel "Margem" — linha 1 eras (silhuetas), linha 2 metas, linha 3 moradores (zen: só a faixa)
+      const isIdle = game.mode === 'idle' && LQ.IdleData && s.idle;
+      el.classList.toggle('margem', !!isIdle);
+      if (isIdle){
+        const D = LQ.IdleData, eras = D.eras || [];
+        const era = LQ.Idle && LQ.Idle.era ? (typeof LQ.Idle.era() === 'number' ? LQ.Idle.era() : s.idle.era || 0) : (s.idle.era || 0);
+        // silhuetas SVG (viewBox 24): lanterna, píer, barco, ponte, templo, sol — cada uma ligada a uma era
+        const SIL = [
+          { era: 1, nome: 'Lanterna', d: 'M9 4h6M10 4v3h4V4M8 7h8l1 9H7z|M12 9v5|M11 16v4h2v-4' },
+          { era: 2, nome: 'Píer', d: 'M3 12h16|M5 12v6M9 12v6M13 12v6M17 12v6|M19 12l2-2' },
+          { era: 3, nome: 'Barco', d: 'M4 13l2 4h12l2-4z|M12 4v9|M12 4l5 7h-5' },
+          { era: 4, nome: 'Ponte', d: 'M2 16c3-7 17-7 20 0|M2 16h20|M7 16v-3M12 16v-4M17 16v-3' },
+          { era: 4, nome: 'Templo', d: 'M4 10l8-5 8 5|M6 10v9h12v-9|M10 19v-4h4v4|M12 13h.01' },
+          { era: 5, nome: 'Sol', d: 'M4 16a8 8 0 0 1 16 0|M2 16h20|M12 4v2M5 7l1.5 1.5M19 7l-1.5 1.5' },
+        ];
+        const fmt = LQ.IdleUtil && LQ.IdleUtil.fmt ? LQ.IdleUtil.fmt : v => String(v);
+        let m = '<div class="mrow eras">';
+        for (const p of SIL){
+          const e = eras[p.era] || {}, ok = era >= p.era, cur = era === p.era;
+          const title = (e.name || p.nome) + ' · ' + p.nome + (ok ? '' : ' — a partir de ' + fmt(e.life || 0) + ' ondas');
+          m += '<svg class="' + (ok ? (cur ? 'cur' : 'ok') : 'lock') + '" viewBox="0 0 24 24"><title>' + title + '</title>';
+          for (const seg of p.d.split('|')) m += '<path d="' + seg + '"/>';
+          m += '</svg>';
+        }
+        // linha de texto: era atual → próxima e limiar (as silhuetas só têm tooltip; no toque nada nomeava a era)
+        const curE = eras[era] || {}, nxtE = eras[era + 1];
+        m += '</div><div class="mtxt">' + (nxtE ? (curE.name || '') + ' → ' + nxtE.name + ' em ' + fmt(nxtE.life || 0) + ' ondas' : (curE.name || '') + ' · a margem está completa') + '</div>';
+        m += '<div class="msep"></div><div class="mrow goals">';
+        const NOME = { primeira_onda: 'Primeira onda', vagalumes_acordam: 'Vagalumes acordam', cardume: 'Cardume', lua_cheia: 'Lua cheia', mil_ondas: 'Um milhão de ondas', lago_vivo: 'Lago vivo', mare_alta: 'Maré alta', nova_noite: 'Nova noite', guardiao_lanterna: 'Guardião da Lanterna', tres_eras: 'Três eras', ouvinte: 'Ouvinte' };
+        for (const g of D.goals || []){
+          const on = s.idle.goals && s.idle.goals.indexOf(g.id) >= 0;
+          const nm = (NOME[g.id] || g.id) + (on ? '' : ' — apagada');
+          m += '<svg class="' + (on ? 'on' : 'off') + '" data-n="' + nm + '"><title>' + nm + '</title><use href="#' + (g.icon || 'ic-coll') + '"/></svg>';
+        }
+        m += '</div><div class="msep"></div>';
+        html = m + '<div class="mrow gens">' + html + '</div>';
+      }
       el.innerHTML = html;
+      // toque/clique numa meta: o nome aparece na linha de texto (sem depender do tooltip do mouse)
+      if (isIdle && !el._mtap){ el._mtap = true; el.addEventListener('click', e => { const t = e.target.closest && e.target.closest('[data-n]'); const x = el.querySelector('.mtxt'); if (t && x){ x.textContent = t.dataset.n; e.stopPropagation(); } }); }
       // morador novo: a faixa aparece sozinha por alguns segundos (fade, sem texto)
       if (newIcon && !silent && !UI.collOpen){
         el.classList.add('open');
@@ -1706,6 +1831,9 @@ window.LQ = window.LQ || {};
     }
     canvas = document.getElementById('lake');
     ctx = canvas.getContext('2d', { alpha: false });
+    // classe do modo antes do 1º resize: o CSS reserva a área da loja (idle) e o canvas já nasce no tamanho certo
+    document.body.classList.toggle('mode-zen', game.mode === 'zen');
+    document.body.classList.toggle('mode-idle', game.mode === 'idle');
     resize();
     updateDayCycle();
     game.palette = targetPalette(); paletteDirty = true;
@@ -1911,16 +2039,23 @@ window.LQ = window.LQ || {};
 </script>
 <script>
 // Vagalumes — zen: 5 com 'fireflies', 15 com 'fireflies2'; idle: população por LQ.Idle.visible('vagalume') (até 30).
-// Movimento = soma de 2 senos, pulso 2-4 s. Glow via game.sprite.glow na camada 'light'. Fogem 30 px do
-// anel (ease 600 ms) e brilham 2 s com tilintar; clique = pulso + nota uma oitava acima. Alguns pousam nas
-// pontas dos juncos e, com 3+ pousados próximos, linhas finas de constelação (alpha 0.15) ligam-os.
+// Movimento = soma de 2 senos, pulso 2-4 s. Glow via game.sprite.glow na camada 'light'. Fogem 40 px do
+// anel (ease 600 ms; a fuga desloca a base — o vagalume NÃO volta) e brilham 2 s com tilintar; clique = pulso
+// + nota uma oitava acima. Alguns pousam nas pontas dos juncos e, com 3+ pousados próximos, linhas finas de
+// constelação (alpha 0.15) ligam-os.
+// Idle: lanterna (LQ.shore.lantern()) — pastoreio: só quem fugiu de um anel do jogador há <10 s (f.herd) é
+// atraído (<150 px) e capturado pela zona; dentro fica imune ao anel por 10 s e orbita; com `need` dentro
+// (ou needPct dos vivos) a lanterna acende: bônus, buff de taxa e todos dispersam. Deriva natural não acende.
 window.LQ = window.LQ || {};
 (function(){
   'use strict';
   const LQ = window.LQ;
   const MAX = 30, BASE = 5, ZEN_MAX = 15;
-  const FLEE_R = 150, FLEE_D = 30, FLEE_T = 0.6, SHINE_T = 2.0;
+  const FLEE_R = 150, FLEE_D = 40, FLEE_T = 0.6, SHINE_T = 2.0;
   const HIT_R = 16, CONST_R = 110;
+  const SAFE_T = 10, AWAY_T = 6, DISPERSE_D = 70, LANTERN_GLOW = '#e8b04a';
+  const HERD_T = 10, ATTR_R = 150, ATTR_K = 1.8; // janela de pastoreio após anel do jogador; raio e força da atração
+  let inside = 0;    // vagalumes orbitando a lanterna neste frame
   const flies = [];
   let lastChime = -1e9, constAlpha = 0, constTimer = 0, lastN = 0;
   const pairs = [];   // pares ligados por linhas de constelação
@@ -1952,6 +2087,8 @@ window.LQ = window.LQ || {};
       state: 0, perch: null, st: 0, land: 0, px: 0, py: 0,    // 0 voa, 1 pousando, 2 pousado, 3 decolando
       sx: 0, sy: 0, wait: 8 + rnd() * 20,                     // origem do pouso; espera até tentar pousar
       fpx: 0, fpy: 0,                                         // última posição livre (freePos)
+      safe: 0, away: 0, orbA: 0, orbR: 0,                     // lanterna: imunidade/órbita; 'away' evita recaptura
+      herd: 0, baked: true,                                   // pastoreio: s desde o último anel do jogador; fuga já fixada na base
       born: -1                                                // game.t do nascimento (fade)
     };
   }
@@ -1973,6 +2110,35 @@ window.LQ = window.LQ || {};
     if (now - lastChime < 0.15) return;   // quase subliminar, nunca em rajada
     lastChime = now;
     game.audio.play('firefly', { x: x / game.W, gain: g });
+  }
+
+  // sai da zona sem salto: base vai `off`·W para fora e o retorno da fuga (1,5 s) leva até lá
+  function leave(f, zone, W, H, game, off){
+    const dx = f.x - zone.x, dy = f.y - zone.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
+    const ox = dx / d * off * W, oy = dy / d * off * W * 0.5;
+    f.bx = Math.min(0.98, Math.max(0.02, (f.x + ox) / W));
+    f.by = Math.min(0.9, Math.max(0.05, (f.y + oy - game.horizonY) / (H - game.horizonY)));
+    f.fx = f.x - f.bx * W; f.fy = f.y - (game.horizonY + f.by * (H - game.horizonY));
+    f.flee = FLEE_T; f.safe = 0; f.away = AWAY_T; f.herd = 0; f.baked = true; // volta suave (branch de retorno), sem re-atração
+  }
+  // lanterna acesa: sino, bônus (max(taxa×rateSec, clique×clickMult)), buff de taxa (aldeia/templo por era) e dispersão
+  function lightUp(zone, n, game, LB){
+    const I = LQ.Idle, D = LQ.IdleData || {}, Bn = D.bonus || {};
+    const era = LQ.shore.era ? LQ.shore.era() : 1;
+    const amount = Math.max((I.totalRate ? I.totalRate() : 0) * (LB.rateSec || 90), (I.clickPower ? I.clickPower() : 0) * (LB.clickMult || 40));
+    if (I.bonus) I.bonus('lantern', { x: zone.x, y: zone.y - 20, amount });
+    // buffs somam no motor: lanterna sempre; aldeia (era 3+) e templo (era 4+) acendem junto
+    if (typeof I.setBuff === 'function'){
+      I.setBuff(LB.buff || 0.25, LB.buffSec || 60, 'lantern');
+      if (era >= 3 && Bn.village) I.setBuff(Bn.village.buff, LB.buffSec || 60, 'village');
+      if (era >= 4 && Bn.temple) I.setBuff(Bn.temple.buff, LB.buffSec || 60, 'temple');
+    }
+    game.audio.play('unlock', { degree: 4, x: zone.x / game.W, gain: 1 });
+    for (let i = 0; i < n; i++){
+      const f = flies[i];
+      if (f.safe > 0){ f.shine = 0; leave(f, zone, game.W, game.H, game, 0.16); }
+    }
+    inside = 0;
   }
 
   const def = {
@@ -2003,12 +2169,23 @@ window.LQ = window.LQ || {};
       const W = game.W, H = game.H;
       // pousar nos juncos: fase 6 (fireflies2, §3) ou, no idle, marco de 5 vagalumes comprados
       const canPerch = game.has('fireflies2') || gc(game, 'vagalume') >= 5;
+      const LZ = game.mode === 'idle' && LQ.shore && LQ.shore.lantern ? LQ.shore.lantern() : null;
+      const zone = LZ && LZ.r > 0 ? LZ : null;
+      inside = 0;
       for (let i = 0; i < MAX; i++){
         const f = flies[i];
         if (i >= n || f.born < 0 || t < f.born) continue;
         if (f.woke === false){ f.woke = true; freePos(f, game); chime(game, f.fpx, 1); }
         f.flee += dt; f.shine += dt;
+        if (f.herd > 0) f.herd -= dt;
         f.bx += f.drift * dt; if (f.bx < 0.02 || f.bx > 0.98) f.drift = -f.drift;
+        // fuga terminou: o deslocamento vira base (o vagalume fica onde o anel o empurrou)
+        if (!f.baked && f.flee >= FLEE_T){
+          f.baked = true;
+          f.bx = Math.min(0.98, Math.max(0.02, f.bx + f.fx / W));
+          f.by = Math.min(0.9, Math.max(0.05, f.by + f.fy / Math.max(1, H - game.horizonY)));
+          f.fx = 0; f.fy = 0;
+        }
         freePos(f, game);
 
         if (f.state === 0){
@@ -2038,7 +2215,30 @@ window.LQ = window.LQ || {};
             f.p1 = -t * f.f1; f.p2 = -t * f.f2; f.p3 = -t * f.f1 * 1.3; f.p4 = -t * f.f2 * 0.8;
           }
         }
-        // Fuga do anel: 30 px em 600 ms, depois volta devagar
+        // Lanterna: dentro da zona → imune 4 s e orbita; ao expirar, sai devagar (via retorno da fuga)
+        if (f.away > 0) f.away -= dt;
+        if (zone && f.state === 0){
+          const dx = f.x - zone.x, dy = f.y - zone.y, d2 = dx * dx + dy * dy;
+          const herded = f.herd > 0 && f.safe <= 0 && f.away <= 0;
+          // pastoreado e perto: a base desliza para a lanterna (o anel só precisa aproximar)
+          if (herded && d2 < ATTR_R * ATTR_R && d2 >= zone.r * zone.r){
+            f.bx -= dx / W * ATTR_K * dt; f.by -= dy / Math.max(1, H - game.horizonY) * ATTR_K * dt;
+          }
+          if (herded && d2 < zone.r * zone.r){ f.safe = SAFE_T; f.orbA = Math.atan2(dy, dx); f.orbR = Math.sqrt(d2); }
+          if (f.safe > 0){
+            f.safe -= dt;
+            f.orbA += dt * 1.6; f.orbR += (zone.r * 0.55 - f.orbR) * Math.min(1, dt * 1.5);
+            f.x = zone.x + Math.cos(f.orbA) * f.orbR; f.y = zone.y + Math.sin(f.orbA) * f.orbR * 0.7;
+            // base acompanha (sem salto quando a imunidade acabar)
+            f.bx = Math.min(0.98, Math.max(0.02, f.x / W));
+            f.by = Math.min(0.9, Math.max(0.05, (f.y - game.horizonY) / (H - game.horizonY)));
+            f.p1 = -t * f.f1; f.p2 = -t * f.f2; f.p3 = -t * f.f1 * 1.3; f.p4 = -t * f.f2 * 0.8;
+            f.fx = 0; f.fy = 0; f.flee = 10;
+            if (f.safe <= 0) leave(f, zone, W, H, game, 0.12); else inside++;
+            continue;
+          }
+        } else if (f.safe > 0) f.safe = 0;
+        // Fuga do anel: 40 px em 600 ms (depois a base absorve); retorno lento só na saída da lanterna (leave)
         if (f.flee < FLEE_T){
           const k = game.ease.easeOutQuad(f.flee / FLEE_T);
           f.x += f.fx * k; f.y += f.fy * k;
@@ -2046,6 +2246,13 @@ window.LQ = window.LQ || {};
           const k = 1 - (f.flee - FLEE_T) / 1.5;
           f.x += f.fx * k; f.y += f.fy * k;
         }
+      }
+
+      // Lanterna acende: need dentro (ou needPct dos vivos, o menor; mínimo 2)
+      if (zone && zone.armed && inside > 0){
+        const LB = (LQ.IdleData && LQ.IdleData.bonus && LQ.IdleData.bonus.lantern) || {};
+        const need = Math.max(2, Math.min(LB.need || 5, Math.ceil((LB.needPct || 0.3) * n)));
+        if (inside >= need && LQ.shore.light()) lightUp(zone, n, game, LB);
       }
 
       // Constelação: 3+ pousados a <110 px entre si (zen: fireflies2; idle: marco de 10 vagalumes)
@@ -2095,6 +2302,12 @@ window.LQ = window.LQ || {};
         ctx.stroke();
       }
 
+      // Halo da lanterna enquanto houver vagalume dentro da zona
+      if (inside > 0 && LQ.shore && LQ.shore.lantern){
+        const z = LQ.shore.lantern();
+        if (z.r > 0){ ctx.globalAlpha = 0.12 * dayFade; ctx.fillStyle = LANTERN_GLOW; ctx.beginPath(); ctx.arc(z.x, z.y, z.r, 0, Math.PI * 2); ctx.fill(); }
+      }
+
       ctx.fillStyle = P.light;
       for (let i = 0; i < n; i++){
         const f = flies[i];
@@ -2119,18 +2332,22 @@ window.LQ = window.LQ || {};
       ctx.globalAlpha = 1;
     },
 
-    // Anel: quem está a <150 px foge 30 px e brilha 2 s (tilintar)
-    onRipple(x, y, game){
+    // Anel: quem está a <150 px foge 40 px (a base acompanha) e brilha 2 s (tilintar); abre a janela de pastoreio.
+    // Anéis automáticos (meta.auto) não espantam; vagalumes na lanterna (safe) são imunes.
+    onRipple(x, y, game, meta){
+      if (meta && meta.auto) return;
       const n = alive(game);
       let any = false;
       for (let i = 0; i < n; i++){
         const f = flies[i];
-        if (f.born < 0 || game.t < f.born) continue;
+        if (f.born < 0 || game.t < f.born || f.safe > 0) continue;
         const dx = f.x - x, dy = f.y - y, d2 = dx * dx + dy * dy;
         if (d2 > FLEE_R * FLEE_R || d2 < 1) continue;
         const d = Math.sqrt(d2);
+        // fuga anterior ainda em curso: fixa o que já andou antes de empurrar de novo
+        if (!f.baked){ const k = game.ease.easeOutQuad(Math.min(1, f.flee / FLEE_T)); f.bx = Math.min(0.98, Math.max(0.02, f.bx + f.fx * k / game.W)); f.by = Math.min(0.9, Math.max(0.05, f.by + f.fy * k / Math.max(1, game.H - game.horizonY))); }
         f.fx = dx / d * FLEE_D; f.fy = dy / d * FLEE_D;
-        f.flee = 0; f.shine = 0; any = true;
+        f.flee = 0; f.shine = 0; f.baked = false; f.herd = HERD_T; any = true;
       }
       if (any) chime(game, x, 0.5);
     },
@@ -2157,7 +2374,7 @@ window.LQ = window.LQ || {};
 
   LQ.register('fireflies', def);
   // leitura (depuração/testes/outras entidades): lista do pool e quantos estão vivos agora
-  LQ.fireflies = { list: flies, alive: () => (LQ.game ? alive(LQ.game) : 0) };
+  LQ.fireflies = { list: flies, alive: () => (LQ.game ? alive(LQ.game) : 0), inside: () => inside };
 })();
 </script>
 <script>
@@ -2174,6 +2391,7 @@ window.LQ = window.LQ || {};
   const N_NORMAL = 8, N_GOLD = 3; // pool: normais 0..7, dourados 8..10
   const EAT_T = 2.2;         // janela para alcançar a pedra (s)
   const JUMP_CD = 6;         // s mínimos entre saltos do mesmo peixe (anéis não viram chuva de saltos)
+  const EAT_CD = 6;          // s mínimos entre refeições do mesmo peixe (o bônus não domina a economia)
   const JUMP_SND_GAP = 1;    // s mínimos entre sons 'fishJump' (global; o dourado/refeição sempre toca)
   const UI_BAND = 72;        // px acima da borda inferior reservados à barra de ícones
   let lastJumpSnd = -1e9;
@@ -2202,7 +2420,7 @@ window.LQ = window.LQ || {};
       p0: null, p1: null, p2: null, p3: null, u: 0, dur: 6,   // curva atual
       pull: null, pullT: 0,                                    // atração ao anel
       target: null, ate: false, shown: -1,                     // pedra a comer; salto de refeição; t em que apareceu (idle)
-      jumping: 0, jx: 0, jy: 0, jumped: false, jumpTimer: 0, jumpCd: 0, pullJump: false, // pullJump: atração veio de pedra (clique) → pode saltar ao chegar
+      jumping: 0, jx: 0, jy: 0, jumped: false, jumpTimer: 0, jumpCd: 0, eatCd: 0, pullJump: false, // pullJump: atração veio de pedra (clique) → pode saltar ao chegar
       diving: 0, dx: 0, dy: 0, tx: 0, ty: 0, born: false };
     for (let i = 0; i < TRAIL; i++) f.trail.push({ x: 0, y: 0 });
     return f;
@@ -2250,7 +2468,7 @@ window.LQ = window.LQ || {};
   }
   // Idle: peixe alcançou a pedra → salto dourado e bônus (×2; ×3 com 10 peixes; ×4 com ração)
   function eat(f, game){
-    f.ate = true;
+    f.ate = true; f.eatCd = EAT_CD;
     startJump(f, game);
     try {
       const B = (LQ.IdleData && LQ.IdleData.bonus) || {};
@@ -2342,6 +2560,7 @@ window.LQ = window.LQ || {};
         f.alpha = 0.35 * fadeOf(f, game);
         if (!f.p0) newPath(f, game);
         if (f.jumpCd > 0) f.jumpCd -= dt;
+        if (f.eatCd > 0) f.eatCd -= dt;
 
         // Mergulho (clique): invisível, reaparece adiante
         if (f.diving > 0){
@@ -2414,7 +2633,8 @@ window.LQ = window.LQ || {};
         }
       }
     },
-    onRipple(x, y, game){
+    onRipple(x, y, game, meta){
+      if (meta && meta.auto) return; // anel automático do idle: decoração, não arrasta peixe
       const act = activeIdx(game);
       let best = null, bd = CURVE_R;
       for (const i of act){
@@ -2447,7 +2667,7 @@ window.LQ = window.LQ || {};
       let best = null, bd = CURVE_R;
       for (const i of act){
         const f = fish[i];
-        if (f.jumping || f.diving || !f.born || hasTarget(f, game)) continue;
+        if (f.jumping || f.diving || !f.born || hasTarget(f, game) || f.eatCd > 0) continue; // em cooldown: não come
         const d = Math.hypot(f.x - p.x, (f.y - p.y) * 1.5);
         if (d < bd){ bd = d; best = f; }
       }
@@ -3794,6 +4014,330 @@ window.LQ = window.LQ || {};
 })();
 </script>
 <script>
+// Margem que Acende — só idle. Peças permanentes por era (lanterna, píer, barco + aldeia, ponte + templo,
+// amanhecer com pássaros), Linha da Margem (medidor logarítmico no horizonte, camada 'hud') e a lanterna
+// (LQ.shore.lantern() / light()) que os vagalumes acendem. Silhuetas em 'reeds' (Path2D), glows em 'light'.
+// Zen (ou era -1): nada é desenhado nem calculado.
+window.LQ = window.LQ || {};
+(function(){
+  'use strict';
+  const LQ = window.LQ;
+  const PIECE_FADE = 8, LIT_T = 1.5, FLASH_T = 0.6, BIRDS_EVERY = 90, GLOW = '#e8b04a';
+  const D = () => LQ.IdleData || {};
+  const eras = () => D().eras || [];
+  const B = () => (D().bonus && D().bonus.lantern) || { radius: 45, need: 5, needPct: 0.3, buff: 0.25, buffSec: 60, cooldown: 90, rateSec: 90, clickMult: 40 };
+
+  let game = null;
+  let shownEra = -1;          // era cuja peça já está em cena (a próxima entra em fade)
+  let fadeAt = {};            // era → game.t em que a peça começou a aparecer (ausente = já pronta)
+  let flash = 10, buffUntil = -1, lit = 10, cooldown = 0;
+  let birdsT = 0, birds = [];
+  let uiHidden = false, uiT = 0;
+  let lastW = 0, lastH = 0;
+  let paths = null;           // Path2D cacheados por tamanho
+  let lastObj = null, origOverride = null, dawnOn = false;
+  let splitMode = false;      // loja embaixo (--shop-h > 0) ou lago baixo: lanterna sobe para não ficar atrás dos toasts
+  let woodFor = '', wood = '#3a2a1c'; // tom de madeira (píer/barco) derivado de palette.dark, cacheado por cor
+
+  const isIdle = () => !!(game && game.mode === 'idle' && LQ.Idle);
+  const S = () => (game && game.state && game.state.idle) || null;
+
+  // era atual: LQ.Idle.era() se existir, senão pelo life acumulado
+  function eraFromLife(life){
+    const E = eras(); let e = 0;
+    for (let i = 0; i < E.length; i++) if (life >= E[i].life) e = i;
+    return e;
+  }
+  // (lê o estado direto: no init desta entidade o motor ainda não recebeu `game`, e LQ.Idle.era() devolveria 0 —
+  //  as peças de um save antigo entrariam todas em fade com sino a cada carregamento)
+  function era(){
+    if (!isIdle()) return -1;
+    const s = S(); if (!s) return -1;
+    let e = Math.max(eraFromLife(s.life || 0), Number.isFinite(s.era) ? s.era : 0);
+    if (typeof LQ.Idle.era === 'function'){ const m = LQ.Idle.era(); if (Number.isFinite(m)) e = Math.max(e, m); }
+    return e;
+  }
+  // fade 0..1 da peça de uma era (1 = pronta)
+  function pieceK(e){
+    const cur = era(); if (cur < e) return 0;
+    const at = fadeAt[e]; if (at === undefined) return 1;
+    return game.ease.smoothstep((game.t - at) / PIECE_FADE);
+  }
+
+  // ---------- geometria (relativa a W/H; cache de Path2D) ----------
+  function lanternPos(){
+    const W = game.W, H = game.H;
+    return { x: Math.round(W * 0.085), y: Math.round(H * (splitMode || H < 500 ? 0.5 : 0.62)) }; // acima da pilha de toasts (split: mais alto)
+  }
+  function build(){
+    const sh = document.getElementById('shop'); splitMode = !!sh && sh.offsetHeight > 0 && sh.getBoundingClientRect().top > 1; // loja embaixo do lago
+    const W = game.W, H = game.H, hy = game.horizonY, L = lanternPos();
+    const p = {};
+    // Lanterna de papel numa estaca: poste + caixa (lados levemente curvos) + tampa
+    const pole = new Path2D();
+    pole.rect(L.x - 1.5, L.y + 12, 3, H - L.y - 8);
+    pole.rect(L.x - 7, L.y - 15, 14, 3);
+    pole.moveTo(L.x - 3, L.y - 12); pole.lineTo(L.x + 3, L.y - 12); pole.lineTo(L.x + 1.5, L.y - 8); pole.lineTo(L.x - 1.5, L.y - 8); pole.closePath();
+    p.pole = pole;
+    const body = new Path2D();
+    body.moveTo(L.x - 8, L.y - 9); body.quadraticCurveTo(L.x - 11, L.y, L.x - 8, L.y + 10);
+    body.lineTo(L.x + 8, L.y + 10); body.quadraticCurveTo(L.x + 11, L.y, L.x + 8, L.y - 9); body.closePath();
+    p.body = body;
+    // Píer à direita: tábuas em leve perspectiva + estacas
+    const py = H * 0.80, px0 = W - W * 0.20, pier = new Path2D();
+    pier.moveTo(px0, py - 7); pier.lineTo(W + 2, py - 12); pier.lineTo(W + 2, py + 4); pier.lineTo(px0, py + 2); pier.closePath();
+    for (let i = 0; i < 4; i++){ const x = px0 + 4 + i * (W * 0.2 - 8) / 3; pier.rect(x - 2, py, 4, 22 + i * 4); }
+    p.pier = pier; p.pierEnd = { x: px0, y: py };
+    // Barco a remo amarrado à ponta do píer (casco + banco), balança em update
+    const boat = new Path2D(), bx = px0 - 34, by = py + 10;
+    boat.moveTo(bx - 22, by); boat.quadraticCurveTo(bx - 14, by + 9, bx, by + 9); boat.quadraticCurveTo(bx + 14, by + 9, bx + 24, by - 1);
+    boat.lineTo(bx + 20, by - 4); boat.quadraticCurveTo(bx, by + 2, bx - 20, by - 3); boat.closePath();
+    boat.rect(bx - 6, by + 1, 12, 2);
+    p.boat = boat; p.boatAt = { x: bx, y: by };
+    // Luzes de aldeia na outra margem (horizonte)
+    p.village = [0, 1, 2].map(i => ({ x: W * (0.60 + i * 0.035) + (i === 1 ? 6 : 0), y: hy - 3 - (i === 1 ? 3 : 0) }));
+    // Ponte em arco no horizonte (esq. do centro) + templo (dir., telhado em duas águas e janela)
+    const bx0 = W * 0.30, bx1 = W * 0.46, bh = Math.max(10, hy * 0.05), bridge = new Path2D();
+    bridge.moveTo(bx0, hy + 1); bridge.quadraticCurveTo((bx0 + bx1) / 2, hy - bh * 2, bx1, hy + 1);
+    bridge.lineTo(bx1 - 6, hy + 1); bridge.quadraticCurveTo((bx0 + bx1) / 2, hy - bh * 1.1, bx0 + 6, hy + 1); bridge.closePath();
+    for (let i = 1; i < 6; i++){ const x = bx0 + (bx1 - bx0) * i / 6; bridge.rect(x - 0.6, hy - bh * 1.9 * Math.sin(Math.PI * i / 6) - 5, 1.2, 6); }
+    p.bridge = bridge;
+    const tx = W * 0.79, th = Math.max(14, hy * 0.07), temple = new Path2D();
+    temple.rect(tx - th * 0.55, hy - th * 0.7, th * 1.1, th * 0.72);
+    temple.moveTo(tx - th * 0.85, hy - th * 0.66); temple.lineTo(tx, hy - th * 1.25); temple.lineTo(tx + th * 0.85, hy - th * 0.66); temple.closePath();
+    temple.rect(tx - th * 0.08, hy - th * 1.45, th * 0.16, th * 0.22);
+    p.temple = temple; p.window = { x: tx + th * 0.18, y: hy - th * 0.36, w: Math.max(2, th * 0.14), h: Math.max(3, th * 0.2) };
+    paths = p; lastW = W; lastH = H;
+  }
+
+  // ---------- amanhecer: compõe rosa 10% no horizonte por cima do override (tinta do prestígio) ----------
+  function mixHex(a, b, t){
+    const A = parseInt(a.slice(1), 16), Bv = parseInt(b.slice(1), 16), o = [];
+    for (let s = 16; s >= 0; s -= 8){ const x = A >> s & 255, y = Bv >> s & 255; o.push(Math.max(0, Math.min(255, Math.round(x + (y - x) * t)))); }
+    return '#' + o.map(v => v.toString(16).padStart(2, '0')).join('');
+  }
+  function baseHorizon(){
+    const th = (LQ.themes && game.state && LQ.themes[game.state.theme]) || {};
+    const n = th.night || th; return n.horizon || '#0b1a33';
+  }
+  function compose(obj){
+    if (!dawnOn) return obj;
+    const out = Object.assign({}, obj || {});
+    const P = game.palette || {};
+    out.horizon = mixHex(out.horizon || baseHorizon(), P.dawn || '#f2b8a2', 0.10);
+    return out;
+  }
+  function installOverride(){
+    if (origOverride || !game.setPaletteOverride) return;
+    origOverride = game.setPaletteOverride.bind(game);
+    // tinta já ativa antes de nós: reconstrói o que themes.js teria passado
+    const t = LQ.themes && LQ.themes.currentTint && LQ.themes.currentTint();
+    if (t){ lastObj = {}; const th = (LQ.themes[game.state.theme] || {}), base = Object.assign({ zenith: '#050914', horizon: '#0b1a33', shore: '#123a5c', ring: '#1f5f7a' }, th.night || th);
+      for (const k of t.keys) if (base[k]) lastObj[k] = mixHex(base[k], t.color, t.amount); }
+    game.setPaletteOverride = function(o){ lastObj = o || null; origOverride(compose(lastObj)); };
+  }
+  function setDawn(on){ if (on === dawnOn) return; dawnOn = on; if (origOverride) origOverride(compose(lastObj)); }
+
+  // ---------- Linha da Margem ----------
+  // progresso 0..1 (log) dentro da era; última era → 1
+  function progress(){
+    const s = S(), E = eras(); if (!s || !E.length) return 0;
+    const e = Math.max(0, Math.min(E.length - 1, era()));
+    if (e >= E.length - 1) return 1;
+    const lo = Math.max(1, E[e].life), hi = Math.max(lo + 1, E[e + 1].life), life = Math.max(lo, s.life || 0);
+    return Math.max(0, Math.min(1, Math.log(life / lo) / Math.log(hi / lo)));
+  }
+  // marcos atingidos na era: por gerador liberado nela, marcos 'at' já alcançados (nós de 2 px)
+  function nodes(){
+    const E = eras(), e = era(); if (e < 0 || !E[e]) return { hit: 0, total: 0 };
+    let hit = 0, total = 0;
+    for (const gid of E[e].gens || []){
+      const g = LQ.Idle.gen ? LQ.Idle.gen(gid) : null; if (!g) continue;
+      const n = LQ.Idle.genCount(gid);
+      for (const m of g.milestones || []){ total++; if (n >= m.at) hit++; }
+    }
+    return { hit, total };
+  }
+  function bell(degree, x){ if (game && game.audio) game.audio.play('unlock', { degree: ((degree % 5) + 5) % 5, x: x == null ? 0.5 : x, gain: 0.8 }); }
+
+  // 3 chevrons de pássaros cruzando o céu (Amanhecer)
+  function flock(){
+    const g = game, dir = g.rand() < 0.5 ? 1 : -1;
+    for (let i = 0; i < 3; i++) birds.push({ x: dir > 0 ? -30 - i * 26 : g.W + 30 + i * 26, y: g.horizonY * (0.25 + i * 0.06 + g.rand() * 0.05), vx: dir * (32 + g.rand() * 8), ph: g.rand() * 6.28 });
+  }
+
+  // ---------- desenho ----------
+  function drawSil(ctx, path, k, P, color){
+    if (k <= 0.005) return;
+    ctx.globalAlpha = k; ctx.fillStyle = color || P.dark; ctx.fill(path);
+  }
+  // madeira: palette.dark puxado para castanho (lê-se como tábua, não como junco)
+  function woodColor(P){
+    const d = typeof P.dark === 'string' && /^#[0-9a-f]{6}$/i.test(P.dark) ? P.dark : '#123a5c';
+    if (d !== woodFor){ woodFor = d; wood = mixHex(d, '#6b4a2a', 0.55); }
+    return wood;
+  }
+  // sombra curta na água (2 px abaixo da peça)
+  function shadow(ctx, path, k, P){
+    if (k <= 0.005) return;
+    ctx.save(); ctx.translate(0, 2); ctx.globalAlpha = k * 0.35; ctx.fillStyle = P.dark; ctx.fill(path); ctx.restore();
+  }
+  function drawReeds(ctx){
+    const P = game.palette, p = paths, t = game.t;
+    const k1 = pieceK(1), k2 = pieceK(2), k3 = pieceK(3), k4 = pieceK(4), k5 = pieceK(5);
+    if (k1 > 0){ drawSil(ctx, p.pole, k1, P);
+      // corpo da lanterna: papel âmbar fraco (apagada) ou aceso
+      const glowK = lit < LIT_T ? Math.sin(Math.PI * Math.min(1, lit / LIT_T)) : 0;
+      ctx.globalAlpha = k1 * (0.35 + 0.55 * glowK); ctx.fillStyle = GLOW; ctx.fill(p.body);
+      ctx.globalAlpha = k1 * 0.8; ctx.strokeStyle = P.dark; ctx.lineWidth = 1; ctx.stroke(p.body); }
+    if (k2 > 0){ shadow(ctx, p.pier, k2, P); drawSil(ctx, p.pier, k2, P, woodColor(P)); }
+    if (k3 > 0){
+      // barco balança devagar, amarrado à ponta do píer
+      const bob = Math.sin(t * 0.9) * 1.5, rot = Math.sin(t * 0.7) * 0.03;
+      ctx.save(); ctx.translate(p.boatAt.x, p.boatAt.y + bob); ctx.rotate(rot); ctx.translate(-p.boatAt.x, -p.boatAt.y);
+      shadow(ctx, p.boat, k3, P); drawSil(ctx, p.boat, k3, P, woodColor(P)); ctx.restore();
+      ctx.globalAlpha = k3 * 0.8; ctx.strokeStyle = P.dark; ctx.lineWidth = 1; ctx.beginPath();
+      ctx.moveTo(p.boatAt.x + 24, p.boatAt.y - 1 + bob); ctx.quadraticCurveTo(p.pierEnd.x - 6, p.pierEnd.y + 8, p.pierEnd.x + 2, p.pierEnd.y + 2); ctx.stroke();
+      // casinhas da aldeia (silhuetas mínimas atrás das luzes)
+      ctx.globalAlpha = k3; ctx.fillStyle = P.dark;
+      for (const v of p.village) ctx.fillRect(v.x - 5, v.y - 4, 10, 7);
+    }
+    if (k4 > 0){ drawSil(ctx, p.bridge, k4, P); drawSil(ctx, p.temple, k4, P); }
+    if (k5 > 0 && birds.length){
+      ctx.globalAlpha = k5 * 0.55; ctx.strokeStyle = P.light; ctx.lineWidth = 1.2; ctx.beginPath(); // claros: o céu ainda é noite
+      for (const b of birds){ const w = 5 + Math.sin(b.ph) * 2.5; ctx.moveTo(b.x - 6, b.y - w * 0.5); ctx.lineTo(b.x, b.y + 1); ctx.lineTo(b.x + 6, b.y - w * 0.5); }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+  function drawLight(ctx){
+    const P = game.palette, p = paths, t = game.t, L = lanternPos();
+    const k1 = pieceK(1), k3 = pieceK(3), k4 = pieceK(4);
+    const dayFade = 1 - (game.dayPhase || 0);
+    if (k1 > 0){
+      // lanterna: âmbar fraco sempre; acesa → glow forte 1,5 s
+      const glowK = lit < LIT_T ? Math.sin(Math.PI * Math.min(1, lit / LIT_T)) : 0;
+      const r = 26 + glowK * 40, g = game.sprite.glow(GLOW, r);
+      ctx.globalAlpha = k1 * (0.16 + 0.7 * glowK) * dayFade;
+      ctx.drawImage(g, L.x - r, L.y - r, r * 2, r * 2);
+    }
+    if (k3 > 0){
+      const g = game.sprite.glow(GLOW, 8), lk = lit < LIT_T ? Math.sin(Math.PI * Math.min(1, lit / LIT_T)) : 0;
+      for (let i = 0; i < p.village.length; i++){
+        const v = p.village[i], fl = 0.75 + 0.25 * Math.sin(t * (1.7 + i * 0.4) + i * 2.1);
+        ctx.globalAlpha = k3 * (0.45 + 0.5 * lk) * fl * dayFade;
+        ctx.drawImage(g, v.x - 8, v.y - 8, 16, 16);
+        ctx.fillStyle = GLOW; ctx.fillRect(v.x - 1, v.y - 1, 2, 2);
+        // reflexo curto na água
+        ctx.globalAlpha = k3 * 0.18 * fl * dayFade; ctx.fillRect(v.x - 0.5, v.y + 4, 1, 10 + 6 * Math.sin(t * 2 + i));
+      }
+    }
+    if (k4 > 0){
+      const w = p.window, lk = lit < LIT_T ? Math.sin(Math.PI * Math.min(1, lit / LIT_T)) : 0, g = game.sprite.glow(GLOW, 10);
+      ctx.globalAlpha = k4 * (0.35 + 0.6 * lk) * dayFade; ctx.drawImage(g, w.x + w.w / 2 - 10, w.y + w.h / 2 - 10, 20, 20);
+      ctx.globalAlpha = k4 * (0.8 + 0.2 * lk) * dayFade; ctx.fillStyle = GLOW; ctx.fillRect(w.x, w.y, w.w, w.h);
+    }
+    ctx.globalAlpha = 1;
+  }
+  // silhueta mínima da próxima peça (destino do traço), centrada em (x, y), ~10 px
+  function nextMark(ctx, x, y, piece){
+    ctx.beginPath();
+    if (piece === 'lantern'){ ctx.rect(x - 3, y - 9, 6, 7); ctx.moveTo(x, y - 2); ctx.lineTo(x, y + 4); }
+    else if (piece === 'pier'){ ctx.moveTo(x - 7, y - 5); ctx.lineTo(x + 7, y - 5); for (const dx of [-5, 0, 5]){ ctx.moveTo(x + dx, y - 5); ctx.lineTo(x + dx, y + 1); } }
+    else if (piece === 'boat'){ ctx.moveTo(x - 7, y - 5); ctx.quadraticCurveTo(x, y + 4, x + 7, y - 5); ctx.moveTo(x, y - 5); ctx.lineTo(x, y - 12); }
+    else if (piece === 'bridge'){ ctx.moveTo(x - 8, y - 1); ctx.quadraticCurveTo(x, y - 12, x + 8, y - 1); ctx.moveTo(x - 8, y - 1); ctx.lineTo(x + 8, y - 1); }
+    else if (piece === 'dawn'){ ctx.arc(x, y - 1, 6, Math.PI, 0); ctx.moveTo(x - 9, y - 1); ctx.lineTo(x + 9, y - 1); }
+    else return;
+    ctx.stroke();
+  }
+  function drawHud(ctx){
+    if (uiHidden && !(game.sinceClick < 10)) return; // barra oculta: some, salvo enquanto o jogador está clicando
+    const s = S(); if (!s) return;
+    const P = game.palette, t = game.t, W = game.W, hy = game.horizonY + 0.5;
+    const e = era(), x0 = e >= 1 ? lanternPos().x + 14 : Math.round(W * 0.06), maxLen = W - x0 - Math.round(W * 0.05);
+    const prog = progress(), len = Math.max(0, maxLen * prog);
+    // destino: a próxima peça em alpha .2 na ponta final do traço
+    const nxt = eras()[e + 1];
+    if (nxt && nxt.piece && nxt.piece !== 'none'){ ctx.globalAlpha = 0.2; ctx.strokeStyle = P.light; ctx.lineWidth = 1; nextMark(ctx, x0 + maxLen, hy - 3, nxt.piece); }
+    const buffOn = (typeof LQ.Idle.buffMult === 'function' && LQ.Idle.buffMult() > 1) || t < buffUntil;
+    let a = 0.35;
+    if (prog >= 0.9 && prog < 1) a = 0.35 + 0.2 * (0.5 + 0.5 * Math.sin(t * Math.PI * 2 / 3));
+    const fl = flash < FLASH_T ? Math.sin(Math.PI * flash / FLASH_T) : 0;
+    const col = buffOn ? GLOW : P.light;
+    if (fl > 0){ ctx.globalAlpha = fl * 0.7; ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x0, hy); ctx.lineTo(x0 + maxLen, hy); ctx.stroke(); }
+    if (len > 1){
+      ctx.globalAlpha = a * (buffOn ? 1.6 : 1); ctx.strokeStyle = col; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x0, hy); ctx.lineTo(x0 + len, hy); ctx.stroke();
+      // ponta viva
+      ctx.globalAlpha = Math.min(1, a * 2.2); ctx.fillStyle = col; ctx.fillRect(x0 + len - 1, hy - 1, 2, 2);
+      // nós: marcos atingidos na era, distribuídos ao longo do traço
+      const nd = nodes();
+      if (nd.hit > 0 && nd.total > 0){
+        ctx.globalAlpha = Math.min(1, a * 2);
+        for (let i = 1; i <= nd.hit; i++){ const x = x0 + len * i / (nd.total + 1); ctx.fillRect(x - 1, hy - 1, 2, 2); }
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  const def = {
+    init(g){
+      game = g; paths = null; fadeAt = {}; birds = []; birdsT = 0; flash = 10; lit = 10; cooldown = 0; buffUntil = -1;
+      if (!isIdle()){ shownEra = -1; return; }
+      shownEra = era();
+      build();
+      installOverride();
+      setDawn(shownEra >= 5);
+    },
+    onResize(g){ if (isIdle() && g) build(); },
+    update(dt, g){
+      if (!isIdle()) return;
+      if (g.W !== lastW || g.H !== lastH) build();
+      const e = era(); if (e < 0) return;
+      if (e > shownEra){
+        // completou a era: flash, sino (grau = era) e peças novas em fade de 8 s
+        if (shownEra >= 0){ flash = 0; bell(e, 0.5); for (let i = shownEra + 1; i <= e; i++) fadeAt[i] = g.t; }
+        shownEra = e;
+      }
+      setDawn(e >= 5);
+      flash += dt; lit += dt;
+      if (cooldown > 0) cooldown = Math.max(0, cooldown - dt);
+      uiT += dt; if (uiT > 0.25){ uiT = 0; uiHidden = document.body.classList.contains('uihidden'); }
+      // pássaros do Amanhecer: 3 chevrons a cada 90 s
+      if (e >= 5){
+        birdsT += dt;
+        if (birdsT >= BIRDS_EVERY && !birds.length){ birdsT = 0; flock(); }
+        for (let i = birds.length - 1; i >= 0; i--){ const b = birds[i]; b.x += b.vx * dt; b.ph += dt * 7; if (b.x < -60 || b.x > g.W + 60) birds.splice(i, 1); }
+      } else birds.length = 0;
+    },
+    draw(layer, ctx, g){
+      if (!isIdle() || !paths || era() < 0) return;
+      if (layer === 'reeds') drawReeds(ctx);
+      else if (layer === 'light') drawLight(ctx);
+      else if (layer === 'hud') drawHud(ctx);
+    }
+  };
+  LQ.register('shore', def);
+
+  LQ.shore = {
+    // zona da lanterna: armed = pode acender agora (Era 1+, sem cooldown, não acesa)
+    lantern(){
+      if (!isIdle() || !game || era() < 1){ return { x: 0, y: 0, r: 0, armed: false, lit: false, cooldown: 0 }; }
+      const L = lanternPos();
+      return { x: L.x, y: L.y, r: B().radius || 45, armed: cooldown <= 0 && lit >= LIT_T, lit: lit < LIT_T, cooldown };
+    },
+    // acende: glow 1,5 s (aldeia/templo acendem junto), cooldown, Linha da Margem dourada enquanto o buff durar
+    light(){
+      if (!isIdle() || era() < 1 || cooldown > 0 || lit < LIT_T) return false;
+      const b = B(); lit = 0; cooldown = b.cooldown || 90; buffUntil = game.t + (b.buffSec || 60);
+      return true;
+    },
+    era, flock,
+    state(){ return { era: era(), shownEra, progress: progress(), nodes: nodes(), lit: lit < LIT_T, cooldown, flash: flash < FLASH_T, buffOn: !!game && game.t < buffUntil, birds: birds.length, dawn: dawnOn, fading: Object.keys(fadeAt).filter(k => pieceK(+k) < 1).map(Number) }; }
+  };
+})();
+</script>
+<script>
 // Lago Quieto — modo Idle: utilidades numéricas (formatação, custos geométricos).
 window.LQ = window.LQ || {};
 LQ.IdleUtil = (function(){
@@ -3860,11 +4404,20 @@ LQ.IdleState = (function(){
 
   function fresh(){
     return {
-      v: 1, cur: 0, life: 0, gens: {}, ups: [],
+      v: 2, cur: 0, life: 0, gens: {}, ups: [],
       prest: { pts: 0, runs: 0, mult: 1 },
       goals: [], lastTick: 0,
-      stats: { clicks: 0, offlineEarned: 0, bestRate: 0, purchases: 0, bonuses: {}, bonusSeen: {} }
+      era: 0,        // índice em IdleData.eras (derivado de life; nunca regride)
+      chatter: true, // toggle "Falatório do lago"
+      stats: { clicks: 0, offlineEarned: 0, bestRate: 0, purchases: 0, bonuses: {}, bonusSeen: {}, chatterShown: 0, seenGens: {} }
     };
+  }
+  // era pelo life acumulado: maior índice cujo limiar foi atingido
+  function eraFor(life){
+    const eras = (LQ.IdleData && LQ.IdleData.eras) || [];
+    let e = 0;
+    for (let i = 0; i < eras.length; i++) if (life >= num(eras[i].life, Infinity)) e = i;
+    return e;
   }
 
   function migrate(s){
@@ -3883,6 +4436,9 @@ LQ.IdleState = (function(){
     const goalIds = D.goals.map(g => g.id);
     out.goals = Array.isArray(s.goals) ? Array.from(new Set(s.goals.filter(x => idOk(x) && goalIds.indexOf(x) >= 0))) : [];
     out.lastTick = pos(s.lastTick);
+    // era: recalculada de life (save v1 não tinha); nunca menor que a gravada
+    out.era = Math.max(Math.min(int(s.era), Math.max(0, ((D.eras || []).length || 1) - 1)), eraFor(out.life));
+    out.chatter = s.chatter === undefined ? true : !!s.chatter;
     const st = s.stats && typeof s.stats === 'object' ? s.stats : {};
     out.stats.clicks = int(st.clicks); out.stats.offlineEarned = pos(st.offlineEarned);
     out.stats.bestRate = pos(st.bestRate); out.stats.purchases = int(st.purchases);
@@ -3894,7 +4450,12 @@ LQ.IdleState = (function(){
     out.stats.bonusSeen = {};
     if (st.bonusSeen && typeof st.bonusSeen === 'object' && !Array.isArray(st.bonusSeen))
       for (const k in st.bonusSeen) if (idOk(k) && st.bonusSeen[k]) out.stats.bonusSeen[k] = true;
-    out.v = 1;
+    out.stats.chatterShown = int(st.chatterShown);
+    // geradores já anunciados na loja (toast "novo morador")
+    out.stats.seenGens = {};
+    if (st.seenGens && typeof st.seenGens === 'object' && !Array.isArray(st.seenGens))
+      for (const k in st.seenGens) if (idOk(k) && st.seenGens[k]) out.stats.seenGens[k] = true;
+    out.v = 2;
     return out;
   }
 
@@ -3923,85 +4484,88 @@ LQ.IdleState = (function(){
     }
   });
 
-  return { fresh, migrate, reconcile };
+  return { fresh, migrate, reconcile, eraFor };
 })();
 </script>
 <script>
-// Lago Quieto — modo Idle: dados de economia (gerados pelo painel de balanceamento, prop "L").
-// Simulação (2 cliques/s 5 min, 0.5/s até 1 h): 1ª compra 4 s; 5 compras distintas 2m30; maior gap 16 s;
-// aurora (10º gerador) 36 min; 1º prestígio 50 min; 2º 1h37.
+// Lago Quieto — modo Idle: dados de economia v3 (prop "v3-final", scripts/econ-props/prop-v3-final.json).
+// clickPower = (clickBase·clickMult + clickPct·rate) · prestígio · combo; clickPct = clickPctBase + Σ pct das Pedras pesadas (máx 0.48).
+// Marcos ×1.5 em 10/25/50/100 e ×2 em 250 (grátis). Geradores só entram na loja quando gen.era ≤ era atual (eras por life acumulado).
+// Sim (perfil ativo, combo 1.3): 1ª compra 4 s; 5 distintas 2m47; gap máx 11 s; aurora 43m59; taxa 30 min 60.6K/s;
+// clique 27% aos 30 min / 16% aos 60; eras 2m47 / 9m44 / 19m50 / 33m11 / 45m22; 1º prestígio 55 min (taxa 1.08M/s).
 window.LQ = window.LQ || {};
 LQ.IdleData = {
   clickBase: 1,
+  clickPctBase: 0.12,
   gens: [
-    {"id":"vagalume","icon":"ic-firefly","unlock":"fireflies","base":8,"growth":1.15,"rate":0.3,"name":"Vagalumes","desc":"mais vagalumes no lago","milestones":[{"at":1,"text":"3 vagalumes acendem"},{"at":5,"text":"9 · pousam nos juncos (se houver)"},{"at":10,"text":"12 · formam constelações"},{"at":25,"text":"enxame de 15"}]},
-    {"id":"juncos","icon":"ic-reed","unlock":"wind","base":35,"growth":1.15,"rate":1.4,"name":"Juncos","desc":"mais juncos na margem","milestones":[{"at":1,"text":"3 brotam à esquerda"},{"at":5,"text":"chegam à direita (9)"},{"at":10,"text":"12 juncos"},{"at":25,"text":"margem cheia (15)"}]},
-    {"id":"peixe","icon":"ic-fish","unlock":"fish","base":150,"growth":1.15,"rate":6,"name":"Peixes","desc":"+1 peixe · come pedras","milestones":[{"at":1,"text":"come as pedras (×2)"},{"at":5,"text":"3 peixes · saltam sozinhos"},{"at":10,"text":"comem as pedras (×3)"},{"at":25,"text":"cardume de 5"}]},
-    {"id":"estrelas","icon":"ic-star","unlock":"stars2","base":600,"growth":1.15,"rate":25,"name":"Estrelas","desc":"céu mais estrelado","milestones":[{"at":1,"text":"15 estrelas"},{"at":5,"text":"céu denso (45)"},{"at":10,"text":"cadentes frequentes"},{"at":25,"text":"75 estrelas"}]},
-    {"id":"lua","icon":"ic-moon","unlock":"moon","base":2200,"growth":1.15,"rate":100,"name":"Lua","desc":"lua e halo maiores","milestones":[{"at":5,"text":"lua cheia maior"},{"at":10,"text":"nuvens"},{"at":25,"text":"halo dourado"},{"at":50,"text":"lua enorme"}]},
-    {"id":"dourado","icon":"ic-goldfish","unlock":"fish2","base":8000,"growth":1.15,"rate":420,"name":"Peixe dourado","desc":"+1 dourado (até 3)","milestones":[{"at":1,"text":"1º dourado"},{"at":5,"text":"3 dourados"}]},
-    {"id":"nevoa","icon":"ic-mountain","unlock":"fog_clear","base":40000,"growth":1.15,"rate":1700,"name":"Montanhas","desc":"cordilheiras ao fundo","milestones":[{"at":1,"text":"névoa abre"},{"at":2,"text":"3ª cordilheira"},{"at":5,"text":"4ª cordilheira"}]},
-    {"id":"lirio","icon":"ic-lily","unlock":"lilies","base":200000,"growth":1.15,"rate":7000,"name":"Lírios","desc":"mais lírios na água","milestones":[{"at":1,"text":"3 lírios"},{"at":5,"text":"5 lírios · toque para florir"},{"at":25,"text":"7 lírios"}]},
-    {"id":"sapo","icon":"ic-frog","unlock":"frog","base":900000,"growth":1.15,"rate":27000,"name":"Sapos","desc":"+1 sapo coaxando","milestones":[{"at":1,"text":"1º coaxo"},{"at":5,"text":"coro de 3 sapos"},{"at":25,"text":"5 sapos"}]},
-    {"id":"aurora","icon":"ic-aurora","unlock":"aurora","base":4000000,"growth":1.15,"rate":100000,"name":"Aurora","desc":"aurora no céu","milestones":[{"at":1,"text":"1ª faixa"},{"at":10,"text":"duas faixas"}]},
+    {"id":"vagalume","icon":"ic-firefly","unlock":"fireflies","era":0,"base":8,"growth":1.13,"rate":0.25,"name":"Vagalumes","desc":"mais vagalumes no lago","milestones":[{"at":1,"text":"3 vagalumes acendem"},{"at":5,"text":"9 · pousam nos juncos (se houver)"},{"at":10,"text":"12 · formam constelações"},{"at":25,"text":"enxame de 15"}]},
+    {"id":"juncos","icon":"ic-reed","unlock":"wind","era":0,"base":40,"growth":1.13,"rate":1.2,"name":"Juncos","desc":"mais juncos na margem","milestones":[{"at":1,"text":"3 brotam à esquerda"},{"at":5,"text":"chegam à direita (9)"},{"at":10,"text":"12 juncos"},{"at":25,"text":"margem cheia (15)"}]},
+    {"id":"peixe","icon":"ic-fish","unlock":"fish","era":1,"base":180,"growth":1.13,"rate":5,"name":"Peixes","desc":"+1 peixe · come pedras","milestones":[{"at":1,"text":"come as pedras (×2)"},{"at":5,"text":"3 peixes · saltam sozinhos"},{"at":10,"text":"comem as pedras (×3)"},{"at":25,"text":"cardume de 5"}]},
+    {"id":"estrelas","icon":"ic-star","unlock":"stars2","era":1,"base":800,"growth":1.15,"rate":20,"name":"Estrelas","desc":"céu mais estrelado","milestones":[{"at":1,"text":"15 estrelas"},{"at":5,"text":"céu denso (45)"},{"at":10,"text":"cadentes frequentes"},{"at":25,"text":"75 estrelas"}]},
+    {"id":"lua","icon":"ic-moon","unlock":"moon","era":2,"base":3000,"growth":1.15,"rate":70,"name":"Lua","desc":"lua e halo maiores","milestones":[{"at":5,"text":"lua cheia maior"},{"at":10,"text":"nuvens"},{"at":25,"text":"halo dourado"},{"at":50,"text":"lua enorme"}]},
+    {"id":"dourado","icon":"ic-goldfish","unlock":"fish2","era":2,"base":12000,"growth":1.15,"rate":250,"name":"Peixe dourado","desc":"+1 dourado (até 3)","milestones":[{"at":1,"text":"1º dourado"},{"at":5,"text":"3 dourados"}]},
+    {"id":"nevoa","icon":"ic-mountain","unlock":"fog_clear","era":3,"base":55000,"growth":1.16,"rate":600,"name":"Montanhas","desc":"cordilheiras ao fundo","milestones":[{"at":1,"text":"névoa abre"},{"at":2,"text":"3ª cordilheira"},{"at":5,"text":"4ª cordilheira"}]},
+    {"id":"lirio","icon":"ic-lily","unlock":"lilies","era":3,"base":250000,"growth":1.16,"rate":2200,"name":"Lírios","desc":"mais lírios na água","milestones":[{"at":1,"text":"3 lírios"},{"at":5,"text":"5 lírios · toque para florir"},{"at":25,"text":"7 lírios"}]},
+    {"id":"sapo","icon":"ic-frog","unlock":"frog","era":4,"base":1000000,"growth":1.16,"rate":13000,"name":"Sapos","desc":"+1 sapo coaxando","milestones":[{"at":1,"text":"1º coaxo"},{"at":5,"text":"coro de 3 sapos"},{"at":25,"text":"5 sapos"}]},
+    {"id":"aurora","icon":"ic-aurora","unlock":"aurora","era":4,"base":2800000,"growth":1.16,"rate":60000,"name":"Aurora","desc":"aurora no céu","milestones":[{"at":1,"text":"1ª faixa"},{"at":10,"text":"duas faixas"}]},
   ],
   upgrades: [
-    {"id":"vagalume_10","gen":"vagalume","kind":"mult","at":10,"cost":null,"value":2,"name":"Vagalumes","desc":"produção de vagalumes ×2 aos 10"},
-    {"id":"vagalume_25","gen":"vagalume","kind":"mult","at":25,"cost":null,"value":2,"name":"Vagalumes","desc":"produção de vagalumes ×2 aos 25"},
-    {"id":"vagalume_50","gen":"vagalume","kind":"mult","at":50,"cost":null,"value":2,"name":"Vagalumes","desc":"produção de vagalumes ×2 aos 50"},
-    {"id":"vagalume_100","gen":"vagalume","kind":"mult","at":100,"cost":null,"value":2,"name":"Vagalumes","desc":"produção de vagalumes ×2 aos 100"},
-    {"id":"vagalume_200","gen":"vagalume","kind":"mult","at":200,"cost":null,"value":2,"name":"Vagalumes","desc":"produção de vagalumes ×2 aos 200"},
-    {"id":"juncos_10","gen":"juncos","kind":"mult","at":10,"cost":null,"value":2,"name":"Juncos","desc":"produção de juncos ×2 aos 10"},
-    {"id":"juncos_25","gen":"juncos","kind":"mult","at":25,"cost":null,"value":2,"name":"Juncos","desc":"produção de juncos ×2 aos 25"},
-    {"id":"juncos_50","gen":"juncos","kind":"mult","at":50,"cost":null,"value":2,"name":"Juncos","desc":"produção de juncos ×2 aos 50"},
-    {"id":"juncos_100","gen":"juncos","kind":"mult","at":100,"cost":null,"value":2,"name":"Juncos","desc":"produção de juncos ×2 aos 100"},
-    {"id":"juncos_200","gen":"juncos","kind":"mult","at":200,"cost":null,"value":2,"name":"Juncos","desc":"produção de juncos ×2 aos 200"},
-    {"id":"peixe_10","gen":"peixe","kind":"mult","at":10,"cost":null,"value":2,"name":"Peixes","desc":"produção de peixes ×2 aos 10"},
-    {"id":"peixe_25","gen":"peixe","kind":"mult","at":25,"cost":null,"value":2,"name":"Peixes","desc":"produção de peixes ×2 aos 25"},
-    {"id":"peixe_50","gen":"peixe","kind":"mult","at":50,"cost":null,"value":2,"name":"Peixes","desc":"produção de peixes ×2 aos 50"},
-    {"id":"peixe_100","gen":"peixe","kind":"mult","at":100,"cost":null,"value":2,"name":"Peixes","desc":"produção de peixes ×2 aos 100"},
-    {"id":"peixe_200","gen":"peixe","kind":"mult","at":200,"cost":null,"value":2,"name":"Peixes","desc":"produção de peixes ×2 aos 200"},
-    {"id":"estrelas_10","gen":"estrelas","kind":"mult","at":10,"cost":null,"value":2,"name":"Estrelas","desc":"produção de estrelas ×2 aos 10"},
-    {"id":"estrelas_25","gen":"estrelas","kind":"mult","at":25,"cost":null,"value":2,"name":"Estrelas","desc":"produção de estrelas ×2 aos 25"},
-    {"id":"estrelas_50","gen":"estrelas","kind":"mult","at":50,"cost":null,"value":2,"name":"Estrelas","desc":"produção de estrelas ×2 aos 50"},
-    {"id":"estrelas_100","gen":"estrelas","kind":"mult","at":100,"cost":null,"value":2,"name":"Estrelas","desc":"produção de estrelas ×2 aos 100"},
-    {"id":"estrelas_200","gen":"estrelas","kind":"mult","at":200,"cost":null,"value":2,"name":"Estrelas","desc":"produção de estrelas ×2 aos 200"},
-    {"id":"lua_10","gen":"lua","kind":"mult","at":10,"cost":null,"value":2,"name":"Lua","desc":"produção de lua ×2 aos 10"},
-    {"id":"lua_25","gen":"lua","kind":"mult","at":25,"cost":null,"value":2,"name":"Lua","desc":"produção de lua ×2 aos 25"},
-    {"id":"lua_50","gen":"lua","kind":"mult","at":50,"cost":null,"value":2,"name":"Lua","desc":"produção de lua ×2 aos 50"},
-    {"id":"lua_100","gen":"lua","kind":"mult","at":100,"cost":null,"value":2,"name":"Lua","desc":"produção de lua ×2 aos 100"},
-    {"id":"lua_200","gen":"lua","kind":"mult","at":200,"cost":null,"value":2,"name":"Lua","desc":"produção de lua ×2 aos 200"},
-    {"id":"dourado_10","gen":"dourado","kind":"mult","at":10,"cost":null,"value":2,"name":"Peixe dourado","desc":"produção de peixe dourado ×2 aos 10"},
-    {"id":"dourado_25","gen":"dourado","kind":"mult","at":25,"cost":null,"value":2,"name":"Peixe dourado","desc":"produção de peixe dourado ×2 aos 25"},
-    {"id":"dourado_50","gen":"dourado","kind":"mult","at":50,"cost":null,"value":2,"name":"Peixe dourado","desc":"produção de peixe dourado ×2 aos 50"},
-    {"id":"dourado_100","gen":"dourado","kind":"mult","at":100,"cost":null,"value":2,"name":"Peixe dourado","desc":"produção de peixe dourado ×2 aos 100"},
-    {"id":"dourado_200","gen":"dourado","kind":"mult","at":200,"cost":null,"value":2,"name":"Peixe dourado","desc":"produção de peixe dourado ×2 aos 200"},
-    {"id":"nevoa_10","gen":"nevoa","kind":"mult","at":10,"cost":null,"value":2,"name":"Montanhas","desc":"produção de montanhas ×2 aos 10"},
-    {"id":"nevoa_25","gen":"nevoa","kind":"mult","at":25,"cost":null,"value":2,"name":"Montanhas","desc":"produção de montanhas ×2 aos 25"},
-    {"id":"nevoa_50","gen":"nevoa","kind":"mult","at":50,"cost":null,"value":2,"name":"Montanhas","desc":"produção de montanhas ×2 aos 50"},
-    {"id":"nevoa_100","gen":"nevoa","kind":"mult","at":100,"cost":null,"value":2,"name":"Montanhas","desc":"produção de montanhas ×2 aos 100"},
-    {"id":"nevoa_200","gen":"nevoa","kind":"mult","at":200,"cost":null,"value":2,"name":"Montanhas","desc":"produção de montanhas ×2 aos 200"},
-    {"id":"lirio_10","gen":"lirio","kind":"mult","at":10,"cost":null,"value":2,"name":"Lírios","desc":"produção de lírios ×2 aos 10"},
-    {"id":"lirio_25","gen":"lirio","kind":"mult","at":25,"cost":null,"value":2,"name":"Lírios","desc":"produção de lírios ×2 aos 25"},
-    {"id":"lirio_50","gen":"lirio","kind":"mult","at":50,"cost":null,"value":2,"name":"Lírios","desc":"produção de lírios ×2 aos 50"},
-    {"id":"lirio_100","gen":"lirio","kind":"mult","at":100,"cost":null,"value":2,"name":"Lírios","desc":"produção de lírios ×2 aos 100"},
-    {"id":"lirio_200","gen":"lirio","kind":"mult","at":200,"cost":null,"value":2,"name":"Lírios","desc":"produção de lírios ×2 aos 200"},
-    {"id":"sapo_10","gen":"sapo","kind":"mult","at":10,"cost":null,"value":2,"name":"Sapos","desc":"produção de sapos ×2 aos 10"},
-    {"id":"sapo_25","gen":"sapo","kind":"mult","at":25,"cost":null,"value":2,"name":"Sapos","desc":"produção de sapos ×2 aos 25"},
-    {"id":"sapo_50","gen":"sapo","kind":"mult","at":50,"cost":null,"value":2,"name":"Sapos","desc":"produção de sapos ×2 aos 50"},
-    {"id":"sapo_100","gen":"sapo","kind":"mult","at":100,"cost":null,"value":2,"name":"Sapos","desc":"produção de sapos ×2 aos 100"},
-    {"id":"sapo_200","gen":"sapo","kind":"mult","at":200,"cost":null,"value":2,"name":"Sapos","desc":"produção de sapos ×2 aos 200"},
-    {"id":"aurora_10","gen":"aurora","kind":"mult","at":10,"cost":null,"value":2,"name":"Aurora","desc":"produção de aurora ×2 aos 10"},
-    {"id":"aurora_25","gen":"aurora","kind":"mult","at":25,"cost":null,"value":2,"name":"Aurora","desc":"produção de aurora ×2 aos 25"},
-    {"id":"aurora_50","gen":"aurora","kind":"mult","at":50,"cost":null,"value":2,"name":"Aurora","desc":"produção de aurora ×2 aos 50"},
-    {"id":"aurora_100","gen":"aurora","kind":"mult","at":100,"cost":null,"value":2,"name":"Aurora","desc":"produção de aurora ×2 aos 100"},
-    {"id":"aurora_200","gen":"aurora","kind":"mult","at":200,"cost":null,"value":2,"name":"Aurora","desc":"produção de aurora ×2 aos 200"},
-    {"id":"click_1","gen":null,"kind":"click","at":null,"cost":15,"value":2,"name":"Pedras pesadas I","desc":"cada pedra rende ×2"},
-    {"id":"click_2","gen":null,"kind":"click","at":null,"cost":150,"value":2,"name":"Pedras pesadas II","desc":"cada pedra rende ×2"},
-    {"id":"click_3","gen":null,"kind":"click","at":null,"cost":1500,"value":2,"name":"Pedras pesadas III","desc":"cada pedra rende ×2"},
-    {"id":"click_4","gen":null,"kind":"click","at":null,"cost":15000,"value":2,"name":"Pedras pesadas IV","desc":"cada pedra rende ×2"},
-    {"id":"click_5","gen":null,"kind":"click","at":null,"cost":150000,"value":2,"name":"Pedras pesadas V","desc":"cada pedra rende ×2"},
-    {"id":"click_6","gen":null,"kind":"click","at":null,"cost":1500000,"value":2,"name":"Pedras pesadas VI","desc":"cada pedra rende ×2"},
+    {"id":"vagalume_10","gen":"vagalume","kind":"mult","at":10,"cost":null,"value":1.5,"name":"Vagalumes","desc":"produção de vagalumes ×1.5 aos 10"},
+    {"id":"vagalume_25","gen":"vagalume","kind":"mult","at":25,"cost":null,"value":1.5,"name":"Vagalumes","desc":"produção de vagalumes ×1.5 aos 25"},
+    {"id":"vagalume_50","gen":"vagalume","kind":"mult","at":50,"cost":null,"value":1.5,"name":"Vagalumes","desc":"produção de vagalumes ×1.5 aos 50"},
+    {"id":"vagalume_100","gen":"vagalume","kind":"mult","at":100,"cost":null,"value":1.5,"name":"Vagalumes","desc":"produção de vagalumes ×1.5 aos 100"},
+    {"id":"vagalume_250","gen":"vagalume","kind":"mult","at":250,"cost":null,"value":2,"name":"Vagalumes","desc":"produção de vagalumes ×2 aos 250"},
+    {"id":"juncos_10","gen":"juncos","kind":"mult","at":10,"cost":null,"value":1.5,"name":"Juncos","desc":"produção de juncos ×1.5 aos 10"},
+    {"id":"juncos_25","gen":"juncos","kind":"mult","at":25,"cost":null,"value":1.5,"name":"Juncos","desc":"produção de juncos ×1.5 aos 25"},
+    {"id":"juncos_50","gen":"juncos","kind":"mult","at":50,"cost":null,"value":1.5,"name":"Juncos","desc":"produção de juncos ×1.5 aos 50"},
+    {"id":"juncos_100","gen":"juncos","kind":"mult","at":100,"cost":null,"value":1.5,"name":"Juncos","desc":"produção de juncos ×1.5 aos 100"},
+    {"id":"juncos_250","gen":"juncos","kind":"mult","at":250,"cost":null,"value":2,"name":"Juncos","desc":"produção de juncos ×2 aos 250"},
+    {"id":"peixe_10","gen":"peixe","kind":"mult","at":10,"cost":null,"value":1.5,"name":"Peixes","desc":"produção de peixes ×1.5 aos 10"},
+    {"id":"peixe_25","gen":"peixe","kind":"mult","at":25,"cost":null,"value":1.5,"name":"Peixes","desc":"produção de peixes ×1.5 aos 25"},
+    {"id":"peixe_50","gen":"peixe","kind":"mult","at":50,"cost":null,"value":1.5,"name":"Peixes","desc":"produção de peixes ×1.5 aos 50"},
+    {"id":"peixe_100","gen":"peixe","kind":"mult","at":100,"cost":null,"value":1.5,"name":"Peixes","desc":"produção de peixes ×1.5 aos 100"},
+    {"id":"peixe_250","gen":"peixe","kind":"mult","at":250,"cost":null,"value":2,"name":"Peixes","desc":"produção de peixes ×2 aos 250"},
+    {"id":"estrelas_10","gen":"estrelas","kind":"mult","at":10,"cost":null,"value":1.5,"name":"Estrelas","desc":"produção de estrelas ×1.5 aos 10"},
+    {"id":"estrelas_25","gen":"estrelas","kind":"mult","at":25,"cost":null,"value":1.5,"name":"Estrelas","desc":"produção de estrelas ×1.5 aos 25"},
+    {"id":"estrelas_50","gen":"estrelas","kind":"mult","at":50,"cost":null,"value":1.5,"name":"Estrelas","desc":"produção de estrelas ×1.5 aos 50"},
+    {"id":"estrelas_100","gen":"estrelas","kind":"mult","at":100,"cost":null,"value":1.5,"name":"Estrelas","desc":"produção de estrelas ×1.5 aos 100"},
+    {"id":"estrelas_250","gen":"estrelas","kind":"mult","at":250,"cost":null,"value":2,"name":"Estrelas","desc":"produção de estrelas ×2 aos 250"},
+    {"id":"lua_10","gen":"lua","kind":"mult","at":10,"cost":null,"value":1.5,"name":"Lua","desc":"produção de lua ×1.5 aos 10"},
+    {"id":"lua_25","gen":"lua","kind":"mult","at":25,"cost":null,"value":1.5,"name":"Lua","desc":"produção de lua ×1.5 aos 25"},
+    {"id":"lua_50","gen":"lua","kind":"mult","at":50,"cost":null,"value":1.5,"name":"Lua","desc":"produção de lua ×1.5 aos 50"},
+    {"id":"lua_100","gen":"lua","kind":"mult","at":100,"cost":null,"value":1.5,"name":"Lua","desc":"produção de lua ×1.5 aos 100"},
+    {"id":"lua_250","gen":"lua","kind":"mult","at":250,"cost":null,"value":2,"name":"Lua","desc":"produção de lua ×2 aos 250"},
+    {"id":"dourado_10","gen":"dourado","kind":"mult","at":10,"cost":null,"value":1.5,"name":"Peixe dourado","desc":"produção de peixe dourado ×1.5 aos 10"},
+    {"id":"dourado_25","gen":"dourado","kind":"mult","at":25,"cost":null,"value":1.5,"name":"Peixe dourado","desc":"produção de peixe dourado ×1.5 aos 25"},
+    {"id":"dourado_50","gen":"dourado","kind":"mult","at":50,"cost":null,"value":1.5,"name":"Peixe dourado","desc":"produção de peixe dourado ×1.5 aos 50"},
+    {"id":"dourado_100","gen":"dourado","kind":"mult","at":100,"cost":null,"value":1.5,"name":"Peixe dourado","desc":"produção de peixe dourado ×1.5 aos 100"},
+    {"id":"dourado_250","gen":"dourado","kind":"mult","at":250,"cost":null,"value":2,"name":"Peixe dourado","desc":"produção de peixe dourado ×2 aos 250"},
+    {"id":"nevoa_10","gen":"nevoa","kind":"mult","at":10,"cost":null,"value":1.5,"name":"Montanhas","desc":"produção de montanhas ×1.5 aos 10"},
+    {"id":"nevoa_25","gen":"nevoa","kind":"mult","at":25,"cost":null,"value":1.5,"name":"Montanhas","desc":"produção de montanhas ×1.5 aos 25"},
+    {"id":"nevoa_50","gen":"nevoa","kind":"mult","at":50,"cost":null,"value":1.5,"name":"Montanhas","desc":"produção de montanhas ×1.5 aos 50"},
+    {"id":"nevoa_100","gen":"nevoa","kind":"mult","at":100,"cost":null,"value":1.5,"name":"Montanhas","desc":"produção de montanhas ×1.5 aos 100"},
+    {"id":"nevoa_250","gen":"nevoa","kind":"mult","at":250,"cost":null,"value":2,"name":"Montanhas","desc":"produção de montanhas ×2 aos 250"},
+    {"id":"lirio_10","gen":"lirio","kind":"mult","at":10,"cost":null,"value":1.5,"name":"Lírios","desc":"produção de lírios ×1.5 aos 10"},
+    {"id":"lirio_25","gen":"lirio","kind":"mult","at":25,"cost":null,"value":1.5,"name":"Lírios","desc":"produção de lírios ×1.5 aos 25"},
+    {"id":"lirio_50","gen":"lirio","kind":"mult","at":50,"cost":null,"value":1.5,"name":"Lírios","desc":"produção de lírios ×1.5 aos 50"},
+    {"id":"lirio_100","gen":"lirio","kind":"mult","at":100,"cost":null,"value":1.5,"name":"Lírios","desc":"produção de lírios ×1.5 aos 100"},
+    {"id":"lirio_250","gen":"lirio","kind":"mult","at":250,"cost":null,"value":2,"name":"Lírios","desc":"produção de lírios ×2 aos 250"},
+    {"id":"sapo_10","gen":"sapo","kind":"mult","at":10,"cost":null,"value":1.5,"name":"Sapos","desc":"produção de sapos ×1.5 aos 10"},
+    {"id":"sapo_25","gen":"sapo","kind":"mult","at":25,"cost":null,"value":1.5,"name":"Sapos","desc":"produção de sapos ×1.5 aos 25"},
+    {"id":"sapo_50","gen":"sapo","kind":"mult","at":50,"cost":null,"value":1.5,"name":"Sapos","desc":"produção de sapos ×1.5 aos 50"},
+    {"id":"sapo_100","gen":"sapo","kind":"mult","at":100,"cost":null,"value":1.5,"name":"Sapos","desc":"produção de sapos ×1.5 aos 100"},
+    {"id":"sapo_250","gen":"sapo","kind":"mult","at":250,"cost":null,"value":2,"name":"Sapos","desc":"produção de sapos ×2 aos 250"},
+    {"id":"aurora_10","gen":"aurora","kind":"mult","at":10,"cost":null,"value":1.5,"name":"Aurora","desc":"produção de aurora ×1.5 aos 10"},
+    {"id":"aurora_25","gen":"aurora","kind":"mult","at":25,"cost":null,"value":1.5,"name":"Aurora","desc":"produção de aurora ×1.5 aos 25"},
+    {"id":"aurora_50","gen":"aurora","kind":"mult","at":50,"cost":null,"value":1.5,"name":"Aurora","desc":"produção de aurora ×1.5 aos 50"},
+    {"id":"aurora_100","gen":"aurora","kind":"mult","at":100,"cost":null,"value":1.5,"name":"Aurora","desc":"produção de aurora ×1.5 aos 100"},
+    {"id":"aurora_250","gen":"aurora","kind":"mult","at":250,"cost":null,"value":2,"name":"Aurora","desc":"produção de aurora ×2 aos 250"},
+    {"id":"click_1","gen":null,"kind":"click","at":null,"cost":15,"value":2,"pct":0.06,"name":"Pedras pesadas I","desc":"cada pedra rende ×2 e +6% do lago"},
+    {"id":"click_2","gen":null,"kind":"click","at":null,"cost":150,"value":2,"pct":0.06,"name":"Pedras pesadas II","desc":"cada pedra rende ×2 e +6% do lago"},
+    {"id":"click_3","gen":null,"kind":"click","at":null,"cost":1500,"value":2,"pct":0.06,"name":"Pedras pesadas III","desc":"cada pedra rende ×2 e +6% do lago"},
+    {"id":"click_4","gen":null,"kind":"click","at":null,"cost":15000,"value":2,"pct":0.06,"name":"Pedras pesadas IV","desc":"cada pedra rende ×2 e +6% do lago"},
+    {"id":"click_5","gen":null,"kind":"click","at":null,"cost":150000,"value":2,"pct":0.06,"name":"Pedras pesadas V","desc":"cada pedra rende ×2 e +6% do lago"},
+    {"id":"click_6","gen":null,"kind":"click","at":null,"cost":1500000,"value":2,"pct":0.06,"name":"Pedras pesadas VI","desc":"cada pedra rende ×2 e +6% do lago"},
     {"id":"auto_1","gen":null,"kind":"auto","at":null,"cost":800,"value":1,"name":"Orvalho +1/s","desc":"anéis automáticos +1/s"},
     {"id":"auto_2","gen":null,"kind":"auto","at":null,"cost":40000,"value":2,"name":"Orvalho +2/s","desc":"anéis automáticos +2/s"},
     {"id":"offline_12h","gen":null,"kind":"offline","at":null,"cost":15000,"value":12,"name":"Sono 12h","desc":"ganho offline até 12h"},
@@ -4009,7 +4573,16 @@ LQ.IdleData = {
     {"id":"offline_24h","gen":null,"kind":"offline","at":null,"cost":4000000,"value":24,"name":"Sono 24h","desc":"ganho offline até 24h"},
     {"id":"racao","gen":null,"kind":"racao","at":null,"cost":20000,"value":4,"name":"Ração","desc":"pedras viram ração; peixes comem ×4"},
   ],
-  prestige: {"K":1500000000},
+  prestige: {"K":700000000},
+  // Eras "A Margem que Acende": limiar em life acumulado (persiste no prestígio); gens liberados na loja; peça permanente na margem.
+  eras: [
+    {"id":"escuro","name":"Lago Escuro","life":0,"gens":["vagalume","juncos"],"piece":"none","toast":{"title":"Lago Escuro","text":"Só a água e o silêncio. Jogue uma pedra."}},
+    {"id":"acordado","name":"Lago Acordado","life":7000,"gens":["peixe","estrelas"],"piece":"lantern","toast":{"title":"Lago Acordado","text":"Alguém acendeu uma lanterna na margem. Vagalumes fogem das ondas… será que cabem nela?"}},
+    {"id":"vivo","name":"Lago Vivo","life":400000,"gens":["lua","dourado"],"piece":"pier","toast":{"title":"Lago Vivo","text":"Um píer de madeira cresceu na margem direita. A lua e o peixe dourado se aproximam."}},
+    {"id":"profundo","name":"Lago Profundo","life":7500000,"gens":["nevoa","lirio"],"piece":"boat","toast":{"title":"Lago Profundo","text":"Um barco amarrado ao píer e três luzes na outra margem: alguém mora ali."}},
+    {"id":"lendario","name":"Lago Lendário","life":55000000,"gens":["sapo","aurora"],"piece":"bridge","toast":{"title":"Lago Lendário","text":"Uma ponte em arco leva às montanhas. No templo, uma janela acesa."}},
+    {"id":"amanhecer","name":"Amanhecer","life":200000000,"gens":[],"piece":"dawn","toast":{"title":"Amanhecer","text":"O horizonte cora de rosa e os primeiros pássaros cruzam o céu."}},
+  ],
   // População visual por gerador: vis(n,base,k,cap) = n<=0 ? 0 : min(cap, base + floor(log2(n))*k)
   pop: {
     vagalume:  {base:3,  k:3,  cap:30},
@@ -4024,9 +4597,12 @@ LQ.IdleData = {
     montanhas: {base:2,  k:1,  cap:4},
     aurora:    {bands2At:10},
   },
-  // Bônus ativos: peixe come pedra (max(clique, taxa×fishRateSec) × 2/3/4), brilhos, combo, cadente
-  bonus: { fishMult:2, fishMult10:3, racaoMult:4, glintEvery:[60,180], glintLife:6, glintRateSec:60,
-           fishRateSec:4, comboStep:0.1, comboCap:2, comboTol:0.12, comboMin:0.3, comboMax:1.5, shootMult:25, shootLife:3.5, shootRadius:40 },
+  // Bônus ativos: peixe come pedra (max(clique, taxa×fishRateSec) × 2/3/4; cooldown 6 s por peixe em fish.js), brilhos, combo, cadente;
+  // lantern: zona da lanterna (raio px, need vagalumes ou needPct dos vivos, buff +25% por buffSec, cooldown; prêmio max(taxa×rateSec, clique×clickMult));
+  // village/temple: buff extra da aldeia (era 3) e do templo (era 4).
+  bonus: {"fishMult":2,"fishMult10":3,"racaoMult":4,"glintEvery":[60,180],"glintLife":6,"glintRateSec":60,"fishRateSec":1,"comboStep":0.1,"comboCap":2,"comboTol":0.12,"comboMin":0.3,"comboMax":1.5,"shootMult":25,"shootLife":3.5,"shootRadius":40,
+           "lantern":{"radius":45,"need":5,"needPct":0.3,"buff":0.25,"buffSec":60,"cooldown":90,"rateSec":90,"clickMult":40},
+           "village":{"buff":0.35},"temple":{"buff":0.5}},
   goals: [
     {"id":"primeira_onda","icon":"ic-coll","cond":{"type":"clicks","value":10}},
     {"id":"vagalumes_acordam","icon":"ic-firefly","cond":{"type":"gens","id":"vagalume","value":1}},
@@ -4036,11 +4612,14 @@ LQ.IdleData = {
     {"id":"lago_vivo","icon":"ic-aurora","cond":{"type":"gens","id":"aurora","value":1}},
     {"id":"mare_alta","icon":"ic-shooting","cond":{"type":"rate","value":100000}},
     {"id":"nova_noite","icon":"ic-star","cond":{"type":"prestige","value":1}},
+    {"id":"guardiao_lanterna","icon":"ic-firefly","cond":{"type":"bonus","id":"lantern","value":10}},
+    {"id":"tres_eras","icon":"ic-moon","cond":{"type":"era","value":3}},
+    {"id":"ouvinte","icon":"ic-coll","cond":{"type":"chatter","value":50}},
   ],
 };
 </script>
 <script>
-// Lago Quieto — modo Idle: motor da economia (taxa, compras, upgrades, metas, offline, anéis automáticos).
+// Lago Quieto — modo Idle: motor da economia v3 (taxa, pedra = fixa + % do lago, buffs, eras, metas, offline, anéis decorativos).
 // API pública em LQ.Idle; a entidade 'idle-engine' só age quando game.mode === 'idle'.
 window.LQ = window.LQ || {};
 LQ.Idle = (function(){
@@ -4077,11 +4656,11 @@ LQ.Idle = (function(){
   function mults(){
     const s = S(); const key = s ? s.ups.length : -1;
     if (cache && key === cacheKey) return cache;
-    const c = { gen: {}, click: 1, auto: 0, offlineH: 8 };
+    const c = { gen: {}, click: 1, pct: 0, auto: 0, offlineH: 8 };
     for (const u of D().upgrades){
       if (!has(u.id)) continue;
       if (u.kind === 'mult') c.gen[u.gen] = (c.gen[u.gen] || 1) * u.value;
-      else if (u.kind === 'click') c.click *= u.value;
+      else if (u.kind === 'click'){ c.click *= u.value; c.pct += u.pct || 0; }
       else if (u.kind === 'auto') c.auto += u.value;
       else if (u.kind === 'offline') c.offlineH = Math.max(c.offlineH, u.value);
     }
@@ -4093,18 +4672,42 @@ LQ.Idle = (function(){
   function clickMult(){ return mults().click; }
   function autoClicks(){ return mults().auto; }
   function globalMult(){ const s = S(); return s ? s.prest.mult : 1; }
-  // ondas/s vindas dos geradores
+  // fração da taxa que cada pedra rende: clickPctBase + Σ pct das Pedras pesadas compradas
+  function clickPct(){ return (D().clickPctBase || 0) + mults().pct; }
+  // Buffs temporários (lanterna/aldeia/templo): não salvos; rate() × (1 + Σ mult ativos)
+  let buffs = [];
+  function buffMult(){ let m = 1; for (const b of buffs) m += b.mult; return m; }
+  function setBuff(mult, sec, id){
+    mult = Number(mult); sec = Number(sec);
+    if (!(mult > 0) || !(sec > 0)) return false;
+    buffs.push({ mult, left: sec, total: sec, id: id || 'buff' });
+    emit('buff', { mult, sec, id: id || 'buff', total: buffMult() });
+    return true;
+  }
+  function tickBuffs(dt){
+    if (!buffs.length) return;
+    let ended = false;
+    for (const b of buffs){ b.left -= dt; if (b.left <= 0) ended = true; }
+    if (ended){ buffs = buffs.filter(b => b.left > 0); emit('buff', { mult: 0, sec: 0, id: 'end', total: buffMult() }); }
+  }
+  function clearBuffs(){ buffs = []; }
+  // ondas/s vindas dos geradores (com prestígio e buffs)
   function rate(){
     const s = S(); if (!s) return 0;
     let r = 0;
     for (const g of D().gens){ const n = s.gens[g.id] || 0; if (n) r += n * g.rate * genMult(g.id); }
-    return r * globalMult();
+    return r * globalMult() * buffMult();
   }
+  // taxa sem buffs temporários (metas e recorde não contam picos de lanterna/aldeia/templo)
+  function baseRate(){ return rate() / buffMult(); }
   // taxa por unidade de um gerador (com os mults do gerador; sem prestígio)
   function genRate(id){ const g = gen(id); return g ? g.rate * genMult(id) : 0; }
-  function clickPower(){ return (D().clickBase || 1) * clickMult() * globalMult(); }
-  // taxa total exibível (geradores + auto-clique)
-  function totalRate(){ return rate() + autoClicks() * clickPower(); }
+  // parte fixa da pedra (o Orvalho/auto paga só isto)
+  function clickFixed(){ return (D().clickBase || 1) * clickMult() * globalMult(); }
+  // pedra = (fixa + clickPct·taxa) · combo  (rate() já traz prestígio e buffs)
+  function clickPower(){ return (clickFixed() + clickPct() * rate()) * combo; }
+  // taxa total exibível (geradores + auto-clique na parte fixa)
+  function totalRate(){ return rate() + autoClicks() * clickFixed(); }
   // teto offline em segundos (8 h base; upgrades kind 'offline' em horas)
   function offlineCap(){ return mults().offlineH * 3600; }
   function genCost(id, n){
@@ -4153,18 +4756,14 @@ LQ.Idle = (function(){
     const halo = hMin + (hMax - hMin) * ((scale - 1) / Math.max(1e-6, cap - 1));
     return { scale, halo };
   }
-  // Largura da loja aberta (0 fechada), lida só ao abrir/fechar/redimensionar (offsetWidth força layout)
-  let shopW = 0;
-  function refreshShopW(){
-    const el = document.getElementById('shop');
-    shopW = el && el.classList.contains('open') ? el.offsetWidth : 0;
-  }
-  // Ponto aleatório na água, fora do painel da loja e acima da barra (H-90)
-  // Loja em tela cheia (≤600px: shopW ≥ W) cobre tudo: ignora-a (senão x degenera para [20,60], atrás do painel)
-  const shopCovers = () => shopW > 0 && game && shopW >= game.W;
+  // A loja nunca cobre o canvas (layout reservado via --shop-w): largura coberta é sempre 0.
+  // Mantidos por compatibilidade (sky.js/glints.js leem shopWidth/shopCovers).
+  const shopW = 0;
+  function refreshShopW(){ return 0; }
+  const shopCovers = () => false;
+  // Ponto aleatório na água: canvas todo, acima da barra (H-90)
   function lakePoint(){
-    const sw = shopCovers() ? 0 : shopW;
-    const x = 20 + game.rand() * Math.max(40, game.W - 40 - sw);
+    const x = 20 + game.rand() * Math.max(40, game.W - 40);
     const y = game.horizonY + 20 + game.rand() * Math.max(10, game.H - game.horizonY - 90);
     return { x, y };
   }
@@ -4200,6 +4799,26 @@ LQ.Idle = (function(){
     prevDt = inRange ? dtc : -1;
   }
   function resetCombo(){ lastStoneT = -1; prevDt = -1; setCombo(1); }
+
+  // ---------- Eras "A Margem que Acende" ----------
+  // índice da era pelo life acumulado (nunca menor que o gravado em s.era)
+  function era(){
+    const s = S(); if (!s) return 0;
+    const eras = D().eras || []; let e = 0;
+    for (let i = 0; i < eras.length; i++) if (s.life >= eras[i].life) e = i;
+    return Math.max(e, s.era || 0);
+  }
+  function eraInfo(i){ const eras = D().eras || []; return eras[i === undefined ? era() : i] || null; }
+  // subiu de era → grava e emite 'era' (uma emissão por era, em ordem)
+  function checkEra(){
+    const s = S(); if (!s || prestigeBusy()) return;
+    const target = era(), eras = D().eras || [];
+    while ((s.era || 0) < target){
+      s.era = (s.era || 0) + 1;
+      const e = eras[s.era];
+      if (e) emit('era', { index: s.era, id: e.id, name: e.name, piece: e.piece, toast: e.toast, gens: e.gens || [] });
+    }
+  }
   // ração comprada → pedra vira 3 pontinhos (game.js desenha)
   function syncStoneStyle(){ if (game) game.stoneStyle = has('racao') ? 'racao' : 'stone'; }
 
@@ -4239,7 +4858,7 @@ LQ.Idle = (function(){
         // marco automático: sino curto para o salto de taxa não passar em silêncio
         const gi = D().gens.findIndex(g => g.id === u.gen);
         if (game && game.audio) game.audio.play('unlock', { degree: (gi < 0 ? 0 : gi) % 5, gain: 0.8 });
-        emit('upgrade', { id: u.id, kind: 'mult', auto: true, gen: u.gen, value: u.value });
+        emit('upgrade', { id: u.id, kind: 'mult', auto: true, gen: u.gen, value: u.value, at: u.at });
       }
     }
   }
@@ -4257,7 +4876,7 @@ LQ.Idle = (function(){
     const pts = prestigePoints(); if (pts < 1) return false;
     s.prest.pts += pts; s.prest.runs++; s.prest.mult = 1 + 0.1 * s.prest.pts;
     frozenGens = Object.assign({}, s.gens);
-    s.cur = 0; s.gens = {};
+    s.cur = 0; s.gens = {}; clearBuffs(); // life fica → eras nunca regridem
     s.ups = s.ups.filter(id => { const u = upgrade(id); return u && u.kind === 'offline'; }); // teto offline é permanente
     invalidate(); resetCombo(); syncStoneStyle(); // ração não é permanente → volta a pedra
     emit('prestige', { pts, total: s.prest.pts, runs: s.prest.runs, mult: s.prest.mult });
@@ -4284,8 +4903,11 @@ LQ.Idle = (function(){
       case 'clicks': return s.stats.clicks >= c.value;
       case 'gens': return genCount(c.id) >= c.value;
       case 'life': return s.life >= c.value;
-      case 'rate': return rate() >= c.value;
+      case 'rate': return baseRate() >= c.value;
       case 'prestige': return s.prest.runs >= c.value;
+      case 'bonus': return ((s.stats.bonuses || {})[c.id] || 0) >= c.value;
+      case 'era': return era() >= c.value;
+      case 'chatter': return (s.stats.chatterShown || 0) >= c.value;
       default: return false;
     }
   }
@@ -4302,13 +4924,11 @@ LQ.Idle = (function(){
   // ---------- Entidade ----------
   let goalTimer = 0, ringAcc = 0;
   LQ.register('idle-engine', {
-    init(g){ game = g; invalidate(); frozenGens = null; if (g.mode !== 'idle') return; const s = S(); if (s) s.lastTick = Date.now(); applyMilestones(); syncStoneStyle(); refreshShopW(); },
-    // o núcleo chama call('onResize', game): largura da loja pode ter mudado (≤600px = tela cheia)
-    onResize(g){ if (g && g.mode === 'idle') refreshShopW(); },
+    init(g){ game = g; invalidate(); frozenGens = null; clearBuffs(); if (g.mode !== 'idle') return; const s = S(); if (s){ s.lastTick = Date.now(); if (s.era === undefined) s.era = 0; s.era = Math.max(s.era, era()); } applyMilestones(); syncStoneStyle(); },
     update(dt, g){
       if (g.mode !== 'idle') return; const s = S(); if (!s) return;
-      const r = rate(), auto = autoClicks();
-      const tr = r + auto * clickPower();
+      tickBuffs(dt);
+      const tr = totalRate();
       // Relógio de parede: o núcleo limita dt a 0.05 s; com rAF estrangulado (janela coberta, wallpaper
       // a 15 fps) o tempo real passa mais rápido que a soma dos dt → creditamos a diferença.
       // Gaps longos (> 2 s) valem 50% como offline; teto = offlineCap.
@@ -4324,30 +4944,30 @@ LQ.Idle = (function(){
       const gain = tr * dt;
       s.cur += gain; s.life += gain;
       clampState(s);
-      if (tr > s.stats.bestRate) s.stats.bestRate = tr;
+      const trBase = tr - rate() + baseRate(); // recorde sem buffs
+      if (trBase > s.stats.bestRate) s.stats.bestRate = trBase;
       goalTimer += dt;
-      if (goalTimer >= 1){ goalTimer = 0; checkGoals(); }
+      if (goalTimer >= 1){ goalTimer = 0; checkEra(); checkGoals(); }
       // ritmo quebrado por silêncio → arco do HUD apaga sem esperar o próximo clique
       if (combo > 1 && lastStoneT >= 0 && performance.now() / 1000 - lastStoneT > (B().comboMax || 1.5)) resetCombo();
-      // anéis visuais da automação: spawnRipple não passa por impact() → não gera moeda nem conta ripple
+      // anéis decorativos da automação (≤1/s, auto:true → peixes/vagalumes ignoram; não passam por impact())
       if (tr > 0 && !document.hidden){
-        const f = U.clamp(0.5 + Math.log10(tr + 1) / 2, 0.3, 3); // spawns/s
+        const f = U.clamp(0.25 + Math.log10(tr + 1) / 6, 0.25, 1); // spawns/s
         ringAcc += f * dt;
-        let n = 0;
-        while (ringAcc >= 1 && n < 3){
-          ringAcc -= 1; n++;
-          const pt = lakePoint(); // fora da loja aberta e acima da barra
-          g.spawnRipple(pt.x, pt.y, { strength: U.clamp(0.3 + Math.log10(Math.max(1, tr)) / 8, 0.3, 0.9) });
+        if (ringAcc >= 1){
+          ringAcc -= 1;
+          const pt = lakePoint();
+          g.spawnRipple(pt.x, pt.y, { strength: U.clamp(0.3 + Math.log10(Math.max(1, tr)) / 8, 0.3, 0.7), auto: true });
         }
-        if (ringAcc > 3) ringAcc = 0;
+        if (ringAcc > 2) ringAcc = 0;
       } else ringAcc = 0;
     },
     // moeda SÓ aqui (pedra/lírio/sapo → impact); anéis automáticos nunca chegam neste hook
     onImpact(p, g){
       if (g.mode !== 'idle' || prestigeBusy()) return; const s = S(); if (!s) return; // durante os sinos do prestígio nada soma
-      let amt = clickPower() * (p && p.strength ? p.strength : 1);
-      // pedra: cadência regular multiplica (combo)
-      if (p && p.source === 'stone'){ stepCombo(Number.isFinite(p.t) ? p.t : performance.now() / 1000); amt *= combo; }
+      // pedra: cadência regular multiplica (combo já entra em clickPower)
+      if (p && p.source === 'stone') stepCombo(Number.isFinite(p.t) ? p.t : performance.now() / 1000);
+      const amt = clickPower() * (p && p.strength ? p.strength : 1);
       s.cur += amt; s.life += amt; s.stats.clicks++; clampState(s);
       emit('currency', { x: p ? p.x : g.W / 2, y: p ? p.y : g.horizonY + 40, amount: amt, source: p && p.source, combo });
     },
@@ -4360,24 +4980,259 @@ LQ.Idle = (function(){
       s.lastTick = Date.now(); // evita creditar a mesma ausência de novo no próximo update
       if (sec >= 30) emit('offline', { sec, earned, capped: sec > eff });
     },
-    // loja aberta/fechada: o hud alterna .open no mesmo emit (talvez depois de nós) → lê no próximo tick
-    onShopToggle(){ setTimeout(refreshShopW, 0); }
   });
 
   return {
-    rate, totalRate, autoClicks, clickPower, offlineCap, globalMult,
+    rate, baseRate, totalRate, autoClicks, clickPower, clickFixed, clickPct, offlineCap, globalMult,
+    era, eraInfo, checkEra, setBuff, buffs: () => buffs.map(b => ({ mult: b.mult, left: b.left, total: b.total, id: b.id })), buffMult,
+    stats: () => { const s = S(); return s ? s.stats : null; },
     gen, upgrade, genCount, genMult, genRate, genCost, maxBuy, canBuy, buy, save,
     upgradeAvailable, canBuyUpgrade, buyUpgrade, has,
     prestigePoints, claimPrestige, checkGoals,
-    visible, moon, lakePoint, shopWidth: () => shopW, shopCovers, bonus, combo: () => combo, resetCombo,
+    visible, moon, lakePoint, refreshShopW, shopWidth: () => shopW, shopCovers, bonus, combo: () => combo, resetCombo,
     on, off, emit,
     get state(){ return S(); }
   };
 })();
 </script>
 <script>
-// Lago Quieto — modo Idle: HUD (moeda + taxa + arco de combo), loja lateral legível (nome, frase, marcos em card),
-// toasts (offline / 1º bônus de cada tipo) e floaters "+N" (bônus em dourado).
+// Lago Quieto — modo Idle: pilha de toasts (#toasts, inferior-esquerda acima da barra).
+// API: LQ.Toasts.show({icon, title, text, life, kind, onClick}) · LQ.Toasts.idle() (nada visível nem na fila).
+// Máx 3 visíveis, fila 6 (era/meta nunca descartadas), entrada 300 ms, vida 5 s (era 8 s), saída 800 ms, gap 600 ms,
+// sino 'unlock' em grau crescente (zera quando a pilha esvazia). Só age em game.mode==='idle'.
+// Ouvintes do motor (LQ.Idle.on): novo morador (cur ≥ 0.5·base), marco, ×1.5 automático, era, meta, 1º bônus, offline.
+window.LQ = window.LQ || {};
+LQ.Toasts = (function(){
+  'use strict';
+  const LQ = window.LQ;
+  const D = () => LQ.IdleData || { gens: [], upgrades: [], goals: [], eras: [] };
+  const I = () => LQ.Idle || {};
+  const MAX_VIS = 3, MAX_Q = 6, GAP = 0.6, LIFE = 5, LIFE_ERA = 8, OUT = 0.8;
+  const KEEP = { era: 1, goal: 1 }; // nunca descartados da fila
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const RING = 'M4 13a8 3.2 0 1 0 16 0a8 3.2 0 1 0 -16 0|M8 13a4 1.6 0 1 0 8 0a4 1.6 0 1 0 -8 0';
+  const SPARK = 'M12 3l1.6 6.4L20 12l-6.4 2.6L12 21l-1.6-6.4L4 12l6.4-2.6z';
+  const LANTERN = 'M9 4h6M10 4v3h4V4M8 7h8l1 9H7z|M12 9v5|M11 16v4h2v-4';
+  const CLOCK = 'M12 6v6l4 2|M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18';
+  const BONUS_ICON = { fish: 'ic-fish', fish_racao: 'ic-goldfish', glint: SPARK, shooting: 'ic-shooting', combo: RING, lantern: LANTERN, village: LANTERN, temple: LANTERN };
+  // nome PT das metas (data.goals só tem id/icon/cond)
+  const GOAL_TXT = {
+    primeira_onda: ['Primeira onda', 'Dez pedras no lago. Ele já sabe seu nome.'],
+    vagalumes_acordam: ['Vagalumes acordam', 'A primeira luz que não veio do céu.'],
+    cardume: ['Cardume', '25 peixes no mesmo lago.'],
+    lua_cheia: ['Lua cheia', 'Dez luas e nenhuma coube no céu.'],
+    mil_ondas: ['Um milhão de ondas', 'A água lembra de cada uma.'],
+    lago_vivo: ['Lago vivo', 'A aurora dobrou a esquina do horizonte.'],
+    mare_alta: ['Maré alta', '100K ondas por segundo.'],
+    nova_noite: ['Nova noite', 'O lago recomeçou, mas a margem ficou.'],
+    guardiao_lanterna: ['Guardião da Lanterna', 'Dez vezes a lanterna acendeu por você.'],
+    tres_eras: ['Três eras', 'Barco, píer e lanterna: a margem tem história.'],
+    ouvinte: ['Ouvinte', 'Cinquenta conversas do lago. Você escuta bem.'],
+  };
+  // frase do ×1.5 automático por gerador
+  const MULT_TXT = {
+    vagalume: 'a colônia aprendeu a brilhar junto', juncos: 'o vento passa mais fundo entre eles', peixe: 'o cardume nada em fila',
+    estrelas: 'o céu se organizou em constelações', lua: 'o halo cresceu', dourado: 'as escamas pegam mais luz',
+    nevoa: 'as cordilheiras ecoam', lirio: 'as flores abrem juntas', sapo: 'o coro achou o tom', aurora: 'as faixas dançam em par',
+  };
+
+  // fmt sem ".0"
+  function fmt(n){
+    const U = LQ.IdleUtil; let s;
+    if (U && U.fmt) s = U.fmt(n);
+    else { n = +n || 0; if (n < 1000) return String(Math.floor(n)); const suf = ['', 'K', 'M', 'B', 'T']; let i = 0; while (n >= 1000 && i < suf.length - 1){ n /= 1000; i++; } s = (n < 100 ? n.toFixed(1) : String(Math.floor(n))) + suf[i]; }
+    return String(s).replace(/\.0(?=[A-Za-z]*$)/, '');
+  }
+  function fmtDur(sec){ sec = Math.max(0, sec | 0); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60); return h ? h + 'h' + (m ? String(m).padStart(2, '0') : '') : m + ' min'; }
+  function bonusPhrase(key, p){
+    const m = p && p.mult, amt = p && p.amount;
+    if (key === 'fish_racao') return ['Ração!', 'O peixe comeu ×' + (m || 4)];
+    if (key === 'fish') return ['O peixe comeu a pedra!', m ? 'Vale ×' + m : 'Pedras viram comida'];
+    if (key === 'glint') return ['Brilho dourado!', '+' + fmt(amt || 0) + ' por tocar a luz na água'];
+    if (key === 'shooting') return ['Reflexo da cadente!', 'Tocou o reflexo: ×' + (m || 25)];
+    if (key === 'combo') return ['Ritmo!', 'Pedras em cadência rendem mais'];
+    if (key === 'lantern') return ['A lanterna acendeu!', '+' + fmt(amt || 0) + ' e o lago rende +25% por 1 min'];
+    if (key === 'village') return ['A aldeia acordou!', 'Luzes na outra margem: +35% por 1 min'];
+    if (key === 'temple') return ['O templo acendeu!', 'A janela brilha: +50% por 1 min'];
+    return ['Bônus!', '+' + fmt(amt || 0)];
+  }
+  function iconEl(ic){
+    const s = document.createElementNS(SVG_NS, 'svg'); s.setAttribute('viewBox', '0 0 24 24');
+    if (ic && ic.indexOf('ic-') === 0){ const u = document.createElementNS(SVG_NS, 'use'); u.setAttribute('href', '#' + ic); s.appendChild(u); }
+    else (ic || RING).split('|').forEach(p => { const e = document.createElementNS(SVG_NS, 'path'); e.setAttribute('d', p); s.appendChild(e); });
+    return s;
+  }
+  function el(tag, cls, txt){ const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+  const st = () => (game && game.state && game.state.idle) || null;
+  function eraIdx(){
+    if (I().era) { const e = I().era(); return typeof e === 'number' ? e : (e && e.index) || 0; }
+    const s = st(); if (s && typeof s.era === 'number') return s.era;
+    const eras = D().eras || []; let e = 0; for (let i = 0; i < eras.length; i++) if (s && s.life >= eras[i].life) e = i; return e;
+  }
+
+  // ---------- pilha ----------
+  let game = null, root = null;
+  const vis = [];   // {el, t, life, out}
+  const queue = []; // opções pendentes
+  let gap = 0, degree = 0, seenT = 0;
+  const subs = [];
+
+  function ensureRoot(){
+    if (root && root.isConnected) return root;
+    root = document.getElementById('toasts');
+    if (!root){ root = el('div'); root.id = 'toasts'; root.setAttribute('aria-live', 'polite'); document.body.appendChild(root); }
+    root.textContent = '';
+    return root;
+  }
+  const same = (a, b) => a && b && a.title === b.title && a.text === b.text;
+  function idle(){ return !vis.length && !queue.length; }
+
+  // Enfileira (ou mostra) um toast. Retorna false fora do idle. Duplicatas (título+frase) são ignoradas.
+  function show(o){
+    if (!game || game.mode !== 'idle' || !o) return false;
+    o = { icon: o.icon, title: o.title || '', text: o.text || '', life: o.life, kind: o.kind || 'info', onClick: o.onClick || null };
+    if (vis.some(v => same(v.o, o)) || queue.some(q => same(q, o))) return false;
+    if (queue.length >= MAX_Q){
+      const i = queue.findIndex(q => !KEEP[q.kind]);
+      if (i < 0) return false; // fila só com era/meta: espera
+      queue.splice(i, 1);
+    }
+    queue.push(o);
+    pump();
+    return true;
+  }
+  function pump(){
+    if (!queue.length || gap > 0 || vis.filter(v => !v.out).length >= MAX_VIS) return;
+    const o = queue.shift();
+    const r = ensureRoot();
+    const t = el('div', 'toast ' + o.kind);
+    const ic = el('span', 'ico'); ic.appendChild(iconEl(o.icon)); t.appendChild(ic);
+    const body = el('span', 'body');
+    if (o.title) body.appendChild(el('b', null, o.title));
+    if (o.text) body.appendChild(el('span', 'txt', o.text));
+    t.appendChild(body);
+    if (o.onClick){ t.classList.add('act'); t.addEventListener('click', e => { e.stopPropagation(); try { o.onClick(); } catch (err) {} }); }
+    t.addEventListener('pointerdown', e => e.stopPropagation());
+    r.appendChild(t);
+    // entrada 300 ms: classe no próximo frame (transição de opacity/transform)
+    requestAnimationFrame(() => t.classList.add('show'));
+    const life = o.life || (o.kind === 'era' ? LIFE_ERA : LIFE);
+    vis.push({ el: t, o, t: 0, life, out: false });
+    gap = GAP;
+    if (o.kind !== 'chatter' && game.audio){ game.audio.play('unlock', { degree: degree % 5, gain: o.kind === 'era' ? 1 : 0.6 }); degree++; }
+    if (game.ui && o.kind !== 'chatter') game.ui.wake();
+  }
+  function tick(dt){
+    if (gap > 0) gap -= dt;
+    for (let i = vis.length - 1; i >= 0; i--){
+      const v = vis[i]; v.t += dt;
+      if (!v.out && v.t >= v.life){ v.out = true; v.el.classList.remove('show'); v.el.classList.add('out'); }
+      else if (v.out && v.t >= v.life + OUT){ v.el.remove(); vis.splice(i, 1); }
+    }
+    if (!vis.length && !queue.length){ seenT += dt; if (seenT > 2) degree = 0; } else seenT = 0;
+    pump();
+  }
+  function clear(){ for (const v of vis) v.el.remove(); vis.length = 0; queue.length = 0; gap = 0; degree = 0; }
+
+  // abre o painel Margem (game.js desenha eras/metas/moradores em refreshCollection)
+  function openMargem(){
+    if (!game || game.mode !== 'idle' || !game.ui) return;
+    game.ui.collOpen = true;
+    game.ui.refreshCollection(null, true);
+    const c = document.getElementById('collection'); if (c) c.classList.add('open');
+    game.ui.wake();
+  }
+  const refreshMargem = () => { if (game && game.ui && game.mode === 'idle') game.ui.refreshCollection(null, true); };
+
+  // ---------- ouvintes do motor ----------
+  function bonusSeen(key){
+    const s = st(); if (!s) return true;
+    s.stats = s.stats || {}; s.stats.bonusSeen = s.stats.bonusSeen || {};
+    if (s.stats.bonusSeen[key]) return true;
+    s.stats.bonusSeen[key] = true; return false;
+  }
+  // marco + ×1.5 do mesmo evento saem num só toast: o ×N automático (emitido antes do 'buy') fica pendente até o marco
+  const pendingMult = {}; // 'gen:at' → value
+  function onBuy(p){
+    if (!p) return; const g = D().gens.find(x => x.id === p.id); if (!g || !g.milestones) return;
+    const before = (p.count || 0) - (p.n || 1);
+    for (const m of g.milestones){
+      if (!(before < m.at && p.count >= m.at)) continue;
+      const k = g.id + ':' + m.at, mv = pendingMult[k]; delete pendingMult[k];
+      if (m.at <= 1) continue; // 1º morador: a cena e o toast 'Novo morador' já comunicam
+      show({ icon: g.icon, title: g.name + ' · ' + m.at, text: m.text + (mv ? ' · ×' + mv + ' produção' : ''), kind: 'milestone' });
+    }
+  }
+  function onUpgrade(p){
+    if (!p || !p.auto) return; const g = D().gens.find(x => x.id === p.gen); if (!g) return;
+    if (p.at != null && (g.milestones || []).some(m => m.at === p.at)){ pendingMult[g.id + ':' + p.at] = p.value || 2; return; }
+    show({ icon: g.icon, title: g.name + ' ×' + (p.value || 2), text: MULT_TXT[g.id] || 'produção multiplicada', kind: 'mult' });
+  }
+  function onEra(p){
+    const eras = D().eras || [];
+    const i = typeof p === 'number' ? p : p && (typeof p.era === 'number' ? p.era : typeof p.index === 'number' ? p.index : eras.findIndex(e => e.id === p.id));
+    const e = eras[i >= 0 ? i : eraIdx()]; if (!e) return;
+    const t = e.toast || {};
+    show({ icon: e.piece === 'lantern' ? LANTERN : 'ic-moon', title: t.title || e.name, text: t.text || '', kind: 'era', onClick: openMargem });
+    refreshMargem();
+  }
+  function onGoal(p){
+    if (!p) return; const g = D().goals.find(x => x.id === p.id);
+    const tx = GOAL_TXT[p.id] || [p.id.replace(/_/g, ' '), 'meta alcançada'];
+    show({ icon: p.icon || (g && g.icon) || 'ic-coll', title: 'Meta: ' + tx[0], text: tx[1], kind: 'goal', onClick: openMargem });
+    refreshMargem();
+  }
+  function onBonus(p){
+    if (!p) return; const kind = p.kind || 'bonus';
+    const key = kind === 'fish' && (p.racao || (p.mult >= 4 && I().has && I().has('racao'))) ? 'fish_racao' : kind;
+    if (bonusSeen(key)) return;
+    const ph = bonusPhrase(key, p);
+    show({ icon: BONUS_ICON[key] || SPARK, title: ph[0], text: ph[1], kind: 'bonus' });
+  }
+  function onCombo(p){ if (p && p.mult >= 1.5 && !bonusSeen('combo')){ const ph = bonusPhrase('combo'); show({ icon: RING, title: ph[0], text: ph[1], kind: 'bonus' }); } }
+  function onOffline(p){
+    if (!p || !(p.earned > 0)) return;
+    show({ icon: CLOCK, title: '+' + fmt(p.earned) + ' enquanto você dormia', text: fmtDur(p.sec) + ' de ausência' + (p.capped ? ' (teto do sono)' : ''), kind: 'offline', life: 7 });
+  }
+  // novo morador comprável pela 1ª vez (cur ≥ 0.5·base, era liberada, nunca comprado)
+  let seenT2 = 0;
+  function checkSeen(dt){
+    seenT2 += dt; if (seenT2 < 1) return; seenT2 = 0;
+    const s = st(); if (!s) return;
+    s.stats = s.stats || {}; s.stats.seenGens = s.stats.seenGens || {};
+    const era = eraIdx();
+    for (const g of D().gens){
+      if (s.stats.seenGens[g.id] || (g.era || 0) > era || (s.gens[g.id] || 0) > 0) continue;
+      if (s.cur >= 0.5 * g.base){
+        s.stats.seenGens[g.id] = true;
+        show({ icon: g.icon, title: 'Novo morador: ' + g.name, text: g.desc, kind: 'gen' });
+      }
+    }
+  }
+
+  LQ.register('idle-toasts', {
+    init(g){
+      game = g; clear();
+      for (const off of subs){ try { off(); } catch (e) {} } subs.length = 0;
+      if (g.mode !== 'idle') return;
+      ensureRoot();
+      if (I().on){
+        const sub = (ev, fn) => { const off = I().on(ev, fn); if (typeof off === 'function') subs.push(off); };
+        sub('buy', onBuy); sub('upgrade', onUpgrade); sub('era', onEra); sub('goal', onGoal);
+        sub('bonus', onBonus); sub('combo', onCombo); sub('offline', onOffline);
+        sub('prestige', refreshMargem);
+      }
+    },
+    update(dt, g){ if (g.mode !== 'idle') return; tick(dt); checkSeen(dt); },
+  });
+
+  return { show, idle, clear, openMargem, count: () => vis.length, queued: () => queue.length };
+})();
+</script>
+<script>
+// Lago Quieto — modo Idle: HUD pequeno (anel + arco de combo + taxa), loja SEMPRE visível (nunca fecha, nunca cobre o lago),
+// toast simples (offline / 1º bônus de cada tipo) e floaters "+N" (bônus em dourado).
+// Layout: CSS vars --shop-w/--shop-h no body reservam a área da loja; o canvas #lake ocupa o resto (game.resize lê clientWidth/Height).
 // Só age em game.mode==='idle'. Usa LQ.Idle/LQ.IdleUtil quando existem; senão calcula a partir de LQ.IdleData.
 window.LQ = window.LQ || {};
 (function(){
@@ -4402,6 +5257,14 @@ window.LQ = window.LQ || {};
     return String(s).replace(/\.0(?=[A-Za-z]*$)/, '');
   }
   function fmtRate(n){ n = +n || 0; if (n > 0 && n < 10){ const s = n.toFixed(1); return s.endsWith('.0') ? s.slice(0, -2) : s; } return fmt(n); }
+  // "faltam 1m20" — segundos → 45s / 1m20 / 2h05
+  function fmtTime(sec){
+    if (!Number.isFinite(sec) || sec < 0) return '';
+    if (sec < 60) return Math.ceil(sec) + 's';
+    if (sec < 3600){ const m = Math.floor(sec / 60), s = Math.floor(sec % 60); return m + 'm' + (s < 10 ? '0' : '') + s; }
+    if (sec < 360000){ const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60); return h + 'h' + (m < 10 ? '0' : '') + m; }
+    return Math.floor(sec / 86400) + 'd';
+  }
   // Custo de comprar `qty` unidades tendo `count`
   function cost(g, count, qty){
     if (U().cost) return U().cost(g, count, qty);
@@ -4421,12 +5284,34 @@ window.LQ = window.LQ || {};
     let r = 0; for (const g of D().gens) r += (s.gens[g.id] || 0) * genRate(g, game);
     return r * ((s.prest && s.prest.mult) || 1);
   }
+  function totalRate(game){ return I().totalRate ? I().totalRate() : rate(game); }
   // Taxa por unidade (com upgrades mult daquele gerador)
   function genRate(g, game){
     if (I().genRate) return I().genRate(g.id);
     const s = st(game); let m = 1;
     if (s) for (const u of D().upgrades) if (u.gen === g.id && u.kind === 'mult' && s.ups.indexOf(u.id) >= 0) m *= u.value;
     return g.rate * m;
+  }
+  // taxa total de um gerador (n × por unidade × prestígio)
+  function genTotal(g, n, game){ const s = st(game); return n * genRate(g, game) * ((s && s.prest && s.prest.mult) || 1); }
+  function clickPower(game){
+    if (I().clickPower) return I().clickPower();
+    const s = st(game); let m = 1;
+    if (s) for (const u of D().upgrades) if (u.kind === 'click' && s.ups.indexOf(u.id) >= 0) m *= u.value;
+    return (D().clickBase || 1) * m * ((s && s.prest && s.prest.mult) || 1);
+  }
+  // fração do lago que uma pedra rende (motor expõe clickPct; senão clique/taxa com guarda)
+  function clickPct(game){
+    if (I().clickPct) return I().clickPct();
+    const r = rate(game); if (!(r > 0)) return 0;
+    return clickPower(game) / r;
+  }
+  // era atual (motor expõe era(); senão maior era cujo limiar de life foi atingido)
+  function era(game){
+    if (I().era) return I().era();
+    const s = st(game), eras = D().eras; if (!s || !eras || !eras.length) return 99;
+    let e = 0; for (let i = 0; i < eras.length; i++) if ((s.life || 0) >= (eras[i].life || 0)) e = i;
+    return e;
   }
   function prestigePoints(game){
     if (I().prestigePoints) return I().prestigePoints();
@@ -4453,14 +5338,11 @@ window.LQ = window.LQ || {};
   // texto do floater: frações (lírio/sapo valem 0.5) e ganhos pequenos com combo mostram 1 decimal ("+1.8")
   const fmtGain = (a, dec) => a < 1 || (dec && a < 10 && a % 1) ? a.toFixed(1) : fmt(a);
   const setText = (e, t) => { if (e.textContent !== t) e.textContent = t; }; // evita invalidar estilo sem mudança
-  const HINT_KEY = 'lagoquieto.idle.shopSeen';
-  const HINT_HOLD = 10;     // s que a dica segura a barra visível (por sessão)
   const FLOAT_LIFE = 1.4;   // s de vida do floater "+N"
   const FLOAT_LIFE_GOLD = 2; // bônus dura mais (é raro; merece ser lido)
-  const LONG_PRESS = 400;   // ms de toque para abrir o card no celular
-  const HOVER_DELAY = 250;  // ms de mouse parado antes do card
+  const HOVER_DELAY = 250;  // ms de mouse parado antes de expandir os marcos
   const COMBO_C = 69.1;     // circunferência do arco (r=11 em viewBox 24)
-  let shopSeen = false; try { shopSeen = localStorage.getItem(HINT_KEY) === '1'; } catch (e) {}
+  const UP_SHOW = 0.25;     // melhoria aparece a partir de 25% do custo
 
   // ---------- SVG helpers ----------
   const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -4476,9 +5358,10 @@ window.LQ = window.LQ || {};
   const RING = 'M4 13a8 3.2 0 1 0 16 0a8 3.2 0 1 0 -16 0|M8 13a4 1.6 0 1 0 8 0a4 1.6 0 1 0 -8 0';
   const NEWMOON = 'M12 3.5a8.5 8.5 0 1 0 0 17a8.5 8.5 0 1 0 0-17|M12 3.5a8.5 8.5 0 0 0 0 17c-2.5-2.5-3.5-5.5-3.5-8.5s1-6 3.5-8.5';
   const SPARK = 'M12 3l1.6 6.4L20 12l-6.4 2.6L12 21l-1.6-6.4L4 12l6.4-2.6z';
+  const CHEV = 'M9 6l6 6-6 6';
   const UPICON = { click: 'M13 2.5L5 13.5h6l-1 8 9-11.5h-6l1-7.5z', auto: 'M12 4a8 8 0 1 1-6 2.7|M6 3v4h4', offline: 'M12 6v6l4 2|M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18', racao: 'M7 12a1.5 1.5 0 1 0 0 .01|M12 9a1.5 1.5 0 1 0 0 .01|M17 12a1.5 1.5 0 1 0 0 .01|M12 15a1.5 1.5 0 1 0 0 .01' };
   // ícone do toast por tipo de bônus (id de <symbol> ou path)
-  const BONUS_ICON = { fish: 'ic-fish', fish_racao: 'ic-goldfish', glint: SPARK, shooting: 'ic-shooting', combo: RING };
+  const BONUS_ICON = { fish: 'ic-fish', fish_racao: 'ic-goldfish', glint: SPARK, shooting: 'ic-shooting', combo: RING, lantern: 'ic-firefly' };
   function el(tag, cls, txt){ const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
   // texto do efeito de um upgrade: ×2 (clique), +1/s (auto), 12h (offline), ×4 (ração)
   function fxText(u){ return u.kind === 'click' || u.kind === 'racao' ? '×' + u.value : u.kind === 'auto' ? '+' + u.value + '/s' : u.value + 'h'; }
@@ -4489,25 +5372,44 @@ window.LQ = window.LQ || {};
     if (key === 'fish') return 'O peixe comeu a pedra!' + (m ? ' ×' + m : '');
     if (key === 'glint') return 'Brilho dourado! +' + fmt(amt || 0);
     if (key === 'shooting') return 'Reflexo da cadente!' + (m ? ' ×' + m : ' ×25');
+    if (key === 'lantern') return 'A lanterna acendeu! +' + fmt(amt || 0);
     if (key === 'combo') return 'Ritmo! Pedras em cadência rendem mais'; // sem número: o multiplicador segue subindo no HUD
     return 'Bônus! +' + fmt(amt || 0);
+  }
+  // marcos de um gerador (frases + ×N automáticos) unidos por contagem: [{at, text}]
+  function milestonesOf(g){
+    const byAt = {};
+    for (const m of (g.milestones || [])) if (m && m.at != null) byAt[m.at] = (byAt[m.at] ? byAt[m.at] + ' · ' : '') + m.text;
+    for (const u of D().upgrades) if (u.kind === 'mult' && u.gen === g.id && u.at != null) byAt[u.at] = '×' + u.value + ' produção' + (byAt[u.at] ? ', ' + byAt[u.at] : '');
+    return Object.keys(byAt).map(Number).sort((a, b) => a - b).map(at => ({ at, text: byAt[at] }));
   }
 
   // ---------- entidade ----------
   const H = {
-    hud: null, shop: null, list: null, ups: null, prest: null, toast: null, card: null,
-    qty: 1, open: false, throttle: 0, toastT: 0, toastGap: 0, toastQ: [], dirty: true, hintT: 0, hintOn: false,
-    rows: {}, upRows: {}, cardFor: null, lpTimer: 0, hoverTimer: 0, comboMult: 1,
+    hud: null, shop: null, list: null, ups: null, prest: null, toast: null,
+    qty: 1, tab: 'gens', throttle: 0, toastT: 0, toastGap: 0, toastQ: [], dirty: true,
+    rows: {}, upRows: {}, hoverTimer: 0, hoverId: null, pinId: null, comboMult: 1, lastShopClick: 0,
     subs: [],   // unsubscribes do barramento do motor
     floats: [], // pool de floaters
-    game: null,
+    game: null, ro: null,
 
     init(game){
       this.game = game;
       this.unsubscribe();
       if (game.mode !== 'idle') return;
       this.floats = []; for (let i = 0; i < 24; i++) this.floats.push({ age: 1, x: 0, y: 0, txt: '', gold: false });
-      this.buildHud(); this.buildShop(); this.buildCard();
+      this.buildHud(); this.buildShop();
+      // a loja reserva área via CSS (body.mode-idle); garante a classe antes do 1º resize do núcleo e
+      // observa o canvas: qualquer mudança da área do lago vira um 'resize' (game.W/H = clientWidth/Height)
+      document.body.classList.add('mode-idle');
+      if (!this.ro && window.ResizeObserver){
+        const cv = document.getElementById('lake');
+        if (cv){
+          let raf = 0;
+          this.ro = new ResizeObserver(() => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; window.dispatchEvent(new Event('resize')); }); });
+          this.ro.observe(cv);
+        }
+      }
       // assinatura no barramento do motor (cada on() devolve o unsubscribe)
       if (I().on){
         const sub = (ev, fn) => { const off = I().on(ev, fn); if (typeof off === 'function') this.subs.push(off); };
@@ -4515,17 +5417,19 @@ window.LQ = window.LQ || {};
         sub('offline', p => this.onIdleOffline(p, game));
         sub('bonus', p => this.onBonus(p, game));
         sub('combo', p => this.setCombo(p && p.mult));
-        sub('prestige', () => this.setCombo(1));
-        sub('buy', p => { this.flash(p && this.rows[p.id]); if (this.cardFor && this.cardFor.id === (p && p.id)) this.fillCard(); });
+        sub('prestige', () => { this.setCombo(1); this.dirty = true; this.render(game, true); });
+        sub('era', p => {
+          this.dirty = true; this.render(game, true);
+          // moradores novos: rolam para a vista e ficam marcados 'novo' por 30 s (em telas baixas ficariam abaixo da dobra)
+          const ids = (p && p.gens) || []; let first = null;
+          for (const id of ids){ const row = this.rows[id]; if (!row) continue; first = first || row.r; row.r.classList.add('novo'); clearTimeout(row.novoT); row.novoT = setTimeout(() => row.r.classList.remove('novo'), 30000); }
+          if (first && this.tab === 'gens' && first.scrollIntoView) setTimeout(() => { try { first.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {} }, 350);
+        });
+        sub('buy', p => { this.flash(p && this.rows[p.id]); });
         sub('upgrade', p => {
           if (!p) return;
-          if (p.auto){ // marco automático (×2): acende a linha do gerador e solta um floater "×2" sobre ela
-            const row = this.rows[p.gen]; this.flash(row);
-            if (row && this.open && !row.r.hidden){
-              const b = row.r.getBoundingClientRect();
-              this.spawnFloat('×' + (p.value || 2), b.left + b.width / 2, b.top + b.height / 2 + 18);
-            }
-          } else this.flash(this.upRows[p.id]);
+          if (p.auto) this.flash(this.rows[p.gen]); // marco automático (×1.5): acende a linha (o toast traz o ×N)
+          else this.flash(this.upRows[p.id]);
         });
       }
       this.render(game, true);
@@ -4535,21 +5439,21 @@ window.LQ = window.LQ || {};
       for (const off of this.subs){ try { off(); } catch (e) {} }
       this.subs = [];
     },
-    destroy(){ this.unsubscribe(); clearTimeout(this.lpTimer); clearTimeout(this.hoverTimer); this.hideCard(); },
+    destroy(){ this.unsubscribe(); clearTimeout(this.hoverTimer); if (this.ro){ this.ro.disconnect(); this.ro = null; } },
 
+    // HUD pequeno no canto do lago: anel + arco de combo · taxa · ×combo (o total vive no cabeçalho da loja)
     buildHud(){
       let h = document.getElementById('hud');
       if (!h){ h = el('div'); h.id = 'hud'; document.body.appendChild(h); }
       h.textContent = '';
-      // ícone do anel + arco fino de combo por cima (stroke-dasharray = fração do combo)
       const ring = el('span', 'ring'); ring.appendChild(pathIcon(RING));
       const arc = document.createElementNS(SVG_NS, 'svg'); arc.setAttribute('viewBox', '0 0 24 24'); arc.setAttribute('class', 'combo');
       const c = document.createElementNS(SVG_NS, 'circle'); c.setAttribute('cx', '12'); c.setAttribute('cy', '12'); c.setAttribute('r', '11');
       c.setAttribute('stroke-dasharray', '0 ' + COMBO_C); arc.appendChild(c); ring.appendChild(arc);
       this.comboArc = arc; this.comboCircle = c;
       h.appendChild(ring);
-      this.curEl = el('span', 'cur', '0'); this.rateEl = el('span', 'rate', '0/s'); this.comboEl = el('span', 'cmul', '');
-      h.appendChild(this.curEl); h.appendChild(this.rateEl); h.appendChild(this.comboEl);
+      this.rateEl = el('span', 'rate', '0/s'); this.comboEl = el('span', 'cmul', '');
+      h.appendChild(this.rateEl); h.appendChild(this.comboEl);
       this.toast = el('div', 'toast'); this.toastIco = el('span', 'ico'); this.toastIco.appendChild(pathIcon(RING));
       this.toastTxt = el('span'); this.toast.appendChild(this.toastIco); this.toast.appendChild(this.toastTxt);
       h.appendChild(this.toast);
@@ -4565,7 +5469,7 @@ window.LQ = window.LQ || {};
       const s = st(this.game);
       if (mult >= 1.5 && s){
         s.stats = s.stats || {}; s.stats.bonusSeen = s.stats.bonusSeen || {};
-        if (!s.stats.bonusSeen.combo){ s.stats.bonusSeen.combo = true; this.showToast(RING, bonusPhrase('combo', { mult: 1.5 }), 4); }
+        if (!s.stats.bonusSeen.combo && !LQ.Toasts){ s.stats.bonusSeen.combo = true; this.showToast(RING, bonusPhrase('combo', { mult: 1.5 }), 4); } // com LQ.Toasts o toast vem de idle/toasts.js
       }
       if (!this.comboCircle) return;
       const cap = (D().bonus && D().bonus.comboCap) || 2;
@@ -4575,146 +5479,135 @@ window.LQ = window.LQ || {};
       this.comboArc.classList.toggle('on', f > 0);
     },
 
+    // Loja: cabeçalho fixo (total · /s · por pedra · quantidade · abas) · corpo com scroll · rodapé (prestígio · falatório)
     buildShop(){
       let s = document.getElementById('shop');
       if (!s){ s = document.createElement('aside'); s.id = 'shop'; document.body.appendChild(s); }
       s.textContent = '';
       s.addEventListener('pointerdown', e => e.stopPropagation());
       s.addEventListener('pointerenter', () => { if (this.game.ui) this.game.ui.wake(); });
-      s.addEventListener('scroll', () => this.hideCard(), { passive: true });
-      // seletor x1 / x10 / max (3 pontos)
+      // --- cabeçalho ---
+      const head = el('div', 'sh-head');
+      this.totalEl = el('div', 'total', '0'); head.appendChild(this.totalEl);
+      this.rateBig = el('div', 'rate', '0/s'); head.appendChild(this.rateBig);
+      this.clickEl = el('div', 'click', ''); head.appendChild(this.clickEl);
       const q = el('div', 'qty');
-      [[1, '1'], [10, '10'], ['max', 'max']].forEach(([v, t]) => {
-        const b = el('button', 'dot', t); b.dataset.q = v; b.title = 'x' + t;
+      [[1, 'x1'], [10, 'x10'], [100, 'x100'], ['max', 'max']].forEach(([v, t]) => {
+        const b = el('button', 'seg', t); b.dataset.q = v;
         b.addEventListener('click', () => { this.qty = v; this.dirty = true; this.render(this.game, true); });
         q.appendChild(b);
       });
-      s.appendChild(q); this.qtyEl = q;
-      this.list = el('div', 'gens'); s.appendChild(this.list);
-      this.ups = el('div', 'ups'); s.appendChild(this.ups);
-      this.prest = el('button', 'prest'); this.prest.appendChild(pathIcon(NEWMOON)); this.prestTxt = el('span', null, '+0');
+      head.appendChild(q); this.qtyEl = q;
+      const tabs = el('div', 'tabs');
+      const mk = (id, label) => {
+        const b = el('button', 'tab', label); b.dataset.tab = id;
+        const badge = el('span', 'badge', ''); b.appendChild(badge);
+        b.addEventListener('click', () => { this.tab = id; this.dirty = true; this.render(this.game, true); });
+        tabs.appendChild(b); return { b, badge };
+      };
+      this.tabGens = mk('gens', 'Moradores'); this.tabUps = mk('ups', 'Melhorias');
+      head.appendChild(tabs);
+      s.appendChild(head);
+      // --- corpo ---
+      const body = el('div', 'sh-body');
+      this.list = el('div', 'gens'); body.appendChild(this.list);
+      this.ups = el('div', 'ups'); body.appendChild(this.ups);
+      this.upsEmpty = el('div', 'empty', 'Nenhuma melhoria à vista ainda. Junte mais ondas.'); this.ups.appendChild(this.upsEmpty);
+      s.appendChild(body); this.body = body;
+      // --- rodapé ---
+      const foot = el('div', 'sh-foot');
+      this.prest = el('button', 'prest'); this.prest.appendChild(pathIcon(NEWMOON)); this.prestTxt = el('span', null, 'Nova noite +0');
       this.prest.appendChild(this.prestTxt); this.prest.hidden = true;
       this.prest.addEventListener('click', () => { idleEmit('prestigeRequest', { pts: prestigePoints(this.game) }); });
-      s.appendChild(this.prest);
-      // linhas por gerador (todas criadas, ocultas até serem "compráveis alguma vez")
-      // [ícone] nome ............ contagem
-      //         frase curta (o que muda)
-      //         [barra de progresso até o custo]
-      //         taxa/un ............ ◎ custo
+      foot.appendChild(this.prest);
+      // toggle "Falatório do lago" (state.idle.chatter, padrão ligado); chatter.js lê o estado
+      const lab = el('label', 'chatter');
+      const cb = document.createElement('input'); cb.type = 'checkbox';
+      const sI = st(this.game); cb.checked = !sI || sI.chatter !== false;
+      cb.addEventListener('change', () => { const ss = st(this.game); if (ss) ss.chatter = cb.checked; idleEmit('chatter', { on: cb.checked }); });
+      lab.appendChild(cb); lab.appendChild(el('span', 'sw')); lab.appendChild(el('span', null, 'Falatório do lago'));
+      foot.appendChild(lab); this.chatterCb = cb;
+      s.appendChild(foot);
+      // --- linhas por gerador ---
+      // [ícone 36] nome ..................... x12 ›
+      //            produz 7.2/s · 0.6/s cada
+      //            ◎ 1.2K (×10) ........ faltam 1m20
+      //            [barra 4px]
+      //            próximo marco: 10 → ×1.5, texto (faltam 3)
+      //            [marcos expandidos]
       this.rows = {}; this.upRows = {};
       for (const g of D().gens){
         const r = el('div', 'gen'); r.hidden = true;
         r.tabIndex = 0; r.setAttribute('role', 'button'); r.setAttribute('aria-label', g.name || g.id); // comprável por teclado
         r.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); this.clickGen(g); } });
-        r.addEventListener('focus', () => { if (this.game.ui) this.game.ui.wake(); this.showCard({ type: 'gen', id: g.id, g, el: r }); });
-        r.addEventListener('blur', () => this.hideCard());
+        r.addEventListener('focus', () => { if (this.game.ui) this.game.ui.wake(); });
         r.appendChild(icon(g.icon));
         const mid = el('div', 'mid');
-        const top = el('div', 'top'); const name = el('span', 'name', g.name || g.id); const cnt = el('span', 'n', '0');
-        top.appendChild(name); top.appendChild(cnt);
-        const desc = el('div', 'desc', g.desc || '');
+        const top = el('div', 'top'); const name = el('span', 'name', g.name || g.id); const cnt = el('span', 'n', 'x0');
+        const chev = el('button', 'chev'); chev.appendChild(pathIcon(CHEV)); chev.title = 'marcos'; chev.setAttribute('aria-label', 'marcos');
+        chev.addEventListener('click', e => { e.stopPropagation(); this.pinId = this.pinId === g.id ? null : g.id; this.syncExpand(); });
+        top.appendChild(name); top.appendChild(cnt); top.appendChild(chev);
+        const prod = el('div', 'prod', '');
+        const costL = el('div', 'costl');
+        const cw = el('span', 'c'); cw.appendChild(pathIcon(RING)); const c = el('span', 'v', '0'); cw.appendChild(c); const q2 = el('span', 'q', ''); cw.appendChild(q2);
+        const eta = el('span', 'eta', ''); costL.appendChild(cw); costL.appendChild(eta);
         const bar = el('div', 'bar'); const fill = el('i'); bar.appendChild(fill);
-        const bot = el('div', 'bot'); const per = el('span', 'per', '');
-        const cw = el('span', 'c'); const q = el('span', 'q', ''); cw.appendChild(q); cw.appendChild(pathIcon(RING)); const c = el('span', null, '0'); cw.appendChild(c); // anel = custo; q = "×10"/"×N" quando qty≠1
-        bot.appendChild(per); bot.appendChild(cw);
-        mid.appendChild(top); mid.appendChild(desc); mid.appendChild(bar); mid.appendChild(bot); r.appendChild(mid);
-        r.addEventListener('click', () => { if (r._lp){ r._lp = false; return; } this.clickGen(g); }); // toque longo não compra
-        this.bindCard(r, { type: 'gen', id: g.id, g });
+        const next = el('div', 'next', '');
+        const ms = el('ul', 'ms');
+        mid.appendChild(top); mid.appendChild(prod); mid.appendChild(costL); mid.appendChild(bar); mid.appendChild(next); mid.appendChild(ms); r.appendChild(mid);
+        r.addEventListener('click', () => this.clickGen(g));
+        // hover 250 ms (mouse) expande os marcos inline; sair recolhe (salvo se fixado pelo ›); pausa 1,5 s após compra
+        r.addEventListener('pointerenter', e => {
+          if (e.pointerType !== 'mouse') return;
+          if (performance.now() - this.lastShopClick < 1500) return; // compra em sequência: a lista não pula sob o mouse
+          clearTimeout(this.hoverTimer);
+          this.hoverTimer = setTimeout(() => { this.hoverId = g.id; this.syncExpand(); }, HOVER_DELAY);
+        });
+        r.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse'){ clearTimeout(this.hoverTimer); if (this.hoverId === g.id){ this.hoverId = null; this.syncExpand(); } } });
         this.list.appendChild(r);
-        this.rows[g.id] = { r, cnt, c, fill, per, q };
+        this.rows[g.id] = { r, cnt, c, q: q2, eta, fill, prod, next, ms, msN: -1 };
       }
+      // --- melhorias (grid 2 col): ícone · nome · desc (2 linhas) · custo ---
       for (const u of D().upgrades){
         if (u.kind === 'mult' || u.cost == null) continue; // mult automáticos: sem custo, o motor aplica
         const b = el('button', 'up'); b.hidden = true;
         b.appendChild(pathIcon(UPICON[u.kind] || UPICON.click));
         b.appendChild(el('span', 'name', u.name || u.id));
-        b.appendChild(el('span', 'fx', fxText(u)));
+        b.appendChild(el('span', 'desc', u.desc || fxText(u)));
         const cw = el('span', 'c'); cw.appendChild(pathIcon(RING)); cw.appendChild(el('span', null, fmt(u.cost))); b.appendChild(cw);
-        b.addEventListener('click', () => { if (b._lp){ b._lp = false; return; } if (buyUp(u, this.game)) { this.hideCard(); this.dirty = true; this.render(this.game, true); } });
-        this.bindCard(b, { type: 'up', id: u.id, u });
+        b.addEventListener('click', () => { if (buyUp(u, this.game)) { this.dirty = true; this.render(this.game, true); } });
         this.ups.appendChild(b); this.upRows[u.id] = { b };
       }
       this.shop = s;
     },
 
-    // ---------- card de marcos (hover 250 ms no desktop, toque longo no celular) ----------
-    buildCard(){
-      let c = document.getElementById('shop-card');
-      if (!c){ c = el('div'); c.id = 'shop-card'; document.body.appendChild(c); }
-      c.textContent = ''; c.hidden = true;
-      c.addEventListener('pointerdown', e => e.stopPropagation());
-      this.card = c;
-      // toque fora fecha o card (celular) — registrado uma vez
-      if (!this._docDown){
-        this._docDown = e => { if (this.cardFor && !this.card.contains(e.target) && !(this.cardFor.el && this.cardFor.el.contains(e.target))) this.hideCard(); };
-        document.addEventListener('pointerdown', this._docDown, true);
+    // um gerador expandido por vez (fixado pelo › ou sob o mouse)
+    syncExpand(){
+      const id = this.pinId || this.hoverId;
+      for (const k in this.rows){
+        const row = this.rows[k], on = k === id;
+        if (row.r.classList.contains('exp') !== on) row.r.classList.toggle('exp', on);
+        if (on) this.fillMilestones(k);
       }
     },
-    bindCard(elm, info){
-      info.el = elm;
-      elm.addEventListener('pointerenter', e => {
-        if (e.pointerType !== 'mouse') return;
-        clearTimeout(this.hoverTimer);
-        this.hoverTimer = setTimeout(() => this.showCard(info), HOVER_DELAY); // só após 250 ms parado
-      });
-      elm.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse'){ clearTimeout(this.hoverTimer); this.hideCard(); } });
-      elm.addEventListener('pointerdown', e => {
-        if (e.pointerType === 'mouse') return;
-        clearTimeout(this.lpTimer);
-        this.lpTimer = setTimeout(() => { elm._lp = true; this.showCard(info); }, LONG_PRESS);
-      });
-      const cancel = () => clearTimeout(this.lpTimer);
-      elm.addEventListener('pointerup', cancel); elm.addEventListener('pointercancel', cancel); elm.addEventListener('pointerleave', cancel);
-    },
-    showCard(info){
-      if (!this.card || !this.open) return;
-      this.cardFor = info; this.fillCard(); this.placeCard();
-    },
-    hideCard(){ if (!this.card) return; this.cardFor = null; this.card.hidden = true; },
-    // conteúdo: nome, frase e lista de marcos (✓ atingidos apagados · próximo em destaque · demais normais)
-    fillCard(){
-      const info = this.cardFor, c = this.card; if (!info || !c) return;
-      c.textContent = '';
-      const s = st(this.game);
-      if (info.type === 'gen'){
-        const g = info.g, n = (s && s.gens[g.id]) || 0;
-        c.appendChild(el('div', 'h', g.name || g.id));
-        if (g.desc) c.appendChild(el('div', 'd', g.desc));
-        // marcos do gerador + marcos automáticos ×2 (upgrades kind mult), unidos por contagem
-        const byAt = {};
-        for (const m of (g.milestones || [])) if (m && m.at != null) byAt[m.at] = (byAt[m.at] ? byAt[m.at] + ' · ' : '') + m.text;
-        for (const u of D().upgrades) if (u.kind === 'mult' && u.gen === g.id && u.at != null) byAt[u.at] = (byAt[u.at] ? byAt[u.at] + ' · ' : '') + '×' + u.value + ' produção';
-        const ats = Object.keys(byAt).map(Number).sort((a, b) => a - b);
-        const next = ats.find(a => a > n);
-        const ul = el('ul', 'ms');
-        for (const a of ats){
-          const li = el('li', a <= n ? 'done' : a === next ? 'next' : '');
-          li.appendChild(el('span', 'at', (a <= n ? '✓ ' : '') + a));
-          li.appendChild(el('span', 't', byAt[a]));
-          ul.appendChild(li);
-        }
-        if (ats.length) c.appendChild(ul);
-        c.appendChild(el('div', 'f', n + ' · ' + fmtRate(genRate(g, this.game)) + '/s cada'));
-      } else {
-        const u = info.u;
-        c.appendChild(el('div', 'h', u.name || u.id));
-        if (u.desc) c.appendChild(el('div', 'd', u.desc));
-        c.appendChild(el('div', 'f', 'efeito: ' + fxText(u) + (hasUp(u.id, this.game) ? ' · já ativo' : '')));
+    // lista de marcos: ✓ atingidos apagados · próximo em destaque · demais normais (reconstrói só se a contagem mudou)
+    fillMilestones(id){
+      const row = this.rows[id]; const s = st(this.game); if (!row || !s) return;
+      const g = D().gens.find(x => x.id === id); if (!g) return;
+      const n = s.gens[id] || 0; if (row.msN === n) return; row.msN = n;
+      row.ms.textContent = '';
+      const list = milestonesOf(g); const nx = list.find(m => m.at > n);
+      for (const m of list){
+        const li = el('li', m.at <= n ? 'done' : nx && m.at === nx.at ? 'nxt' : '');
+        li.appendChild(el('span', 'at', (m.at <= n ? '✓ ' : '') + m.at));
+        li.appendChild(el('span', 't', m.text));
+        row.ms.appendChild(li);
       }
-      c.hidden = false;
-    },
-    // à esquerda da linha; se não cabe (loja em tela cheia), abaixo dela; sempre dentro da viewport
-    placeCard(){
-      const info = this.cardFor, c = this.card; if (!info || !c || c.hidden) return;
-      const r = info.el.getBoundingClientRect(), W = window.innerWidth, Hh = window.innerHeight, pad = 8;
-      const cw = c.offsetWidth, ch = c.offsetHeight;
-      let x = r.left - cw - pad, y = r.top;
-      if (x < pad){ x = Math.max(pad, Math.min(W - cw - pad, r.left)); y = r.bottom + 4; if (y + ch > Hh - pad) y = r.top - ch - 4; }
-      y = Math.max(pad, Math.min(Hh - ch - pad, y));
-      c.style.left = Math.round(x) + 'px'; c.style.top = Math.round(y) + 'px';
+      if (!list.length) row.ms.appendChild(el('li', 'done', 'sem marcos'));
     },
 
     clickGen(g){
+      this.lastShopClick = performance.now();
       const s = st(this.game); if (!s || (LQ.IdlePrestige && LQ.IdlePrestige.busy)) return;
       const n = s.gens[g.id] || 0;
       let q = this.qty === 'max' ? maxAffordable(g, n, s.cur) : this.qty;
@@ -4734,19 +5627,11 @@ window.LQ = window.LQ || {};
       if (!best) return;
       best.age = 0; best.txt = txt; best.x = x; best.y = y; best.gold = !!gold; this.dirty = true;
     },
-    // dica de descoberta: enquanto a loja nunca foi aberta e há algo comprável, segura a barra e pulsa o ícone
-    // (segura a barra só por HINT_HOLD s por sessão — depois o lago volta a ficar limpo; o ícone segue pulsando ao acordar)
-    hint(on){
-      const b = document.getElementById('btn-shop'); if (!b) return;
-      this.hintOn = on;
-      if (on && this.hintT < HINT_HOLD){ if (this.game.ui) this.game.ui.wake(); }
-      if (on && !this.hintToasted){ this.hintToasted = true; this.showToast(RING, 'Já dá para acordar o lago: toque no anel da barra', 6); }
-      if (b.classList.contains('hint') !== on) b.classList.toggle('hint', on);
-    },
     // toast curto: ícone (id de symbol ou path) + 1 frase, `sec` segundos
-    // Um slot só: se já há um toast visível, o novo entra numa fila curta (≤3) e aparece quando o atual acabar
-    // (evita a dica da loja ser engolida pelo toast de combo, que costuma chegar no mesmo segundo).
+    // Um slot só: se já há um toast visível, o novo entra numa fila curta (≤3) e aparece quando o atual acabar.
     showToast(ico, txt, sec){
+      // delega para a pilha LQ.Toasts (idle/toasts.js); fallback: slot antigo no HUD
+      if (LQ.Toasts){ LQ.Toasts.show({ icon: ico || RING, title: txt, life: sec, kind: 'info' }); return; }
       if (!this.toast) return;
       if (this.toastT > 0 || this.toastGap > 0){
         if (this.toastQ.length < 3 && this.toastTxt.textContent !== txt && !this.toastQ.some(q => q[1] === txt)) this.toastQ.push([ico, txt, sec]);
@@ -4760,29 +5645,21 @@ window.LQ = window.LQ || {};
     },
 
     // Hooks do núcleo
-    onShopToggle(_, game){
-      if (game.mode !== 'idle' || !this.shop) return;
-      this.open = !this.open;
-      if (!shopSeen){ shopSeen = true; this.hint(false); try { localStorage.setItem(HINT_KEY, '1'); } catch (e) {} }
-      this.shop.classList.toggle('open', this.open);
-      if (!this.open) this.hideCard();
-      if (game.ui){ game.ui.pinned = this.open; game.ui.wake(); }
-      if (this.open) this.render(game, true);
-    },
-    // o núcleo chama call('onResize', game): game é o 1º argumento
-    onResize(game){ if (game && game.mode === 'idle') this.placeCard(); },
+    // loja não abre nem fecha (decisão: sempre visível, nunca sobre o lago) — o antigo toggle é inerte
+    onShopToggle(){},
+    onResize(game){ if (game && game.mode === 'idle'){ this.dirty = true; } },
     // Moeda ganha: floater "+N" (payload {x,y,amount}); também aceito via game.emit('currency')
     onCurrency(p, game){
       if (!game || game.mode !== 'idle' || !p) return;
       const a = p.amount != null ? p.amount : p.value; if (!(a > 0)) return;
       this.spawnFloat('+' + fmtGain(a, p.combo > 1), p.x != null ? p.x : 60, p.y != null ? p.y : 40);
     },
-    // Bônus (peixe/brilho/cadente): floater dourado "+N ✦" e toast na 1ª vez de cada tipo
+    // Bônus (peixe/brilho/cadente/lanterna): floater dourado "+N ✦" e toast na 1ª vez de cada tipo
     onBonus(p, game){
       if (!game || game.mode !== 'idle' || !p) return;
       const a = p.amount != null ? p.amount : p.value;
       if (a > 0) this.spawnFloat('+' + fmtGain(a) + ' ✦', p.x != null ? p.x : game.W / 2, p.y != null ? p.y : game.horizonY + 40, true);
-      const s = st(game); if (!s) return;
+      const s = st(game); if (!s || LQ.Toasts) return; // toast do 1º bônus: idle/toasts.js
       s.stats = s.stats || {}; s.stats.bonusSeen = s.stats.bonusSeen || {};
       const kind = p.kind || 'bonus';
       const key = kind === 'fish' && (p.racao || (p.mult >= 4 && hasUp('racao', game))) ? 'fish_racao' : kind;
@@ -4792,60 +5669,74 @@ window.LQ = window.LQ || {};
     },
     // Ganho offline calculado pelo motor: {earned, seconds}
     onIdleOffline(p, game){
-      if (!game || game.mode !== 'idle' || !p || !(p.earned > 0) || !this.toast) return;
-      this.showToast(RING, '+' + fmt(p.earned), 5);
+      if (!game || game.mode !== 'idle' || !p || !(p.earned > 0) || !this.toast || LQ.Toasts) return; // com LQ.Toasts: idle/toasts.js
+      this.showToast(RING, '+' + fmt(p.earned) + ' enquanto você estava fora', 5);
     },
 
     update(dt, game){
       if (game.mode !== 'idle' || !this.hud) return;
       for (const f of this.floats) if (f.age < 1) f.age += dt / (f.gold ? FLOAT_LIFE_GOLD : FLOAT_LIFE);
-      if (this.hintOn) this.hintT += dt;
       if (this.toastT > 0){ this.toastT -= dt; if (this.toastT <= 0){ this.toast.classList.remove('show'); this.toastGap = this.toastQ.length ? 0.5 : 0; } }
       else if (this.toastGap > 0){ this.toastGap -= dt; if (this.toastGap <= 0 && this.toastQ.length){ const q = this.toastQ.shift(); this.showToast(q[0], q[1], q[2]); } }
       this.throttle += dt;
       if (this.throttle >= 0.1){ this.throttle = 0; this.render(game, false); }
     },
 
-    // Atualiza DOM (≤10×/s). `full` força reavaliação de visibilidade/qty.
+    // Atualiza DOM (≤10×/s). `full` força reavaliação de visibilidade/qty/abas.
     render(game, full){
-      const s = st(game); if (!s || !this.hud) return;
+      const s = st(game); if (!s || !this.hud || !this.shop) return;
       const cur = s.cur || 0;
-      const r = I().totalRate ? I().totalRate() : rate(game); // inclui auto-cliques (o motor ganha com totalRate)
-      setText(this.curEl, fmt(cur));
-      setText(this.rateEl, fmtRate(r) + '/s');
-      // dica da loja: só até a 1ª abertura, quando algo já é comprável
-      if (!shopSeen && !this.open){
-        let can = false;
-        for (const g of D().gens){ if (cur >= cost(g, s.gens[g.id] || 0, 1)){ can = true; break; } }
-        this.hint(can);
+      const tr = totalRate(game); // inclui auto-cliques (o motor ganha com totalRate)
+      setText(this.rateEl, fmtRate(tr) + '/s');
+      // cabeçalho
+      setText(this.totalEl, fmt(cur));
+      setText(this.rateBig, fmtRate(tr) + '/s');
+      const cp = clickPower(game), pct = clickPct(game);
+      setText(this.clickEl, '+' + fmtGain(cp) + ' por pedra' + (pct > 0 ? ' (' + (pct >= 0.995 ? Math.round(pct * 100) : pct * 100 < 1 ? (pct * 100).toFixed(1) : Math.round(pct * 100)) + '% do lago)' : ''));
+      if (full){
+        for (const b of this.qtyEl.children) b.classList.toggle('on', String(this.qty) === b.dataset.q);
+        this.tabGens.b.classList.toggle('on', this.tab === 'gens'); this.tabUps.b.classList.toggle('on', this.tab === 'ups');
+        this.list.hidden = this.tab !== 'gens'; this.ups.hidden = this.tab !== 'ups';
       }
-      if (!this.open && !full) return;
-      for (const b of this.qtyEl.children) b.classList.toggle('on', String(this.qty) === b.dataset.q);
+      // moradores: só os da era atual (ou já comprados)
+      const e = era(game);
       for (const g of D().gens){
         const row = this.rows[g.id]; const n = s.gens[g.id] || 0;
-        const vis = n > 0 || cur >= 0.5 * cost(g, n, 1);
+        const vis = n > 0 || (g.era == null || g.era <= e);
         if (row.r.hidden !== !vis) row.r.hidden = !vis;
-        if (!vis) continue;
+        if (!vis || this.tab !== 'gens') continue;
         let q = this.qty === 'max' ? Math.max(1, maxAffordable(g, n, cur)) : this.qty;
         const c = cost(g, n, q);
-        setText(row.cnt, String(n)); setText(row.c, fmt(c)); setText(row.q, q > 1 ? '×' + q : '');
+        const can = cur >= c;
+        setText(row.cnt, 'x' + n); setText(row.c, fmt(c)); setText(row.q, q > 1 ? '×' + q : '');
+        setText(row.eta, can ? '' : tr > 0 ? 'faltam ' + fmtTime((c - cur) / tr) : 'jogue pedras');
         const w = Math.min(100, cur / c * 100);
         if (Math.abs(w - (row.w || 0)) >= 0.5 || w === 100 && row.w !== 100){ row.w = w; row.fill.style.width = w.toFixed(1) + '%'; }
-        row.r.classList.toggle('can', cur >= c);
-        setText(row.per, fmtRate(genRate(g, game)) + '/s');
+        row.r.classList.toggle('can', can);
+        const per = genRate(g, game);
+        setText(row.prod, n > 0 ? 'produz ' + fmtRate(genTotal(g, n, game)) + '/s · ' + fmtRate(per) + '/s cada' : 'produz ' + fmtRate(per) + '/s cada');
+        if (row.msN !== n || full){
+          const list = milestonesOf(g); const nx = list.find(m => m.at > n);
+          setText(row.next, nx ? 'próximo marco: ' + nx.at + ' → ' + nx.text + ' (faltam ' + (nx.at - n) + ')' : list.length ? 'todos os marcos atingidos' : '');
+          if (row.r.classList.contains('exp')) this.fillMilestones(g.id);
+        }
       }
+      // melhorias: a partir de 25% do custo, não possuídas, não presas a marco
+      let badge = 0, anyUp = false;
       for (const u of D().upgrades){
         const ur = this.upRows[u.id]; if (!ur) continue;
         const owned = s.ups.indexOf(u.id) >= 0;
         const gated = u.gen && u.at != null && (s.gens[u.gen] || 0) < u.at; // upgrade preso a um marco do gerador
-        const vis = !owned && !gated && cur >= 0.5 * u.cost;
+        const vis = !owned && !gated && cur >= UP_SHOW * u.cost;
         if (ur.b.hidden !== !vis) ur.b.hidden = !vis;
-        if (vis) ur.b.classList.toggle('can', cur >= u.cost);
+        if (vis){ anyUp = true; const can = cur >= u.cost; ur.b.classList.toggle('can', can); if (can) badge++; }
       }
+      if (this.upsEmpty.hidden !== anyUp) this.upsEmpty.hidden = anyUp;
+      setText(this.tabUps.badge, badge > 0 ? String(badge) : '');
       const pts = prestigePoints(game);
       if (this.prest.hidden !== (pts < 1)) this.prest.hidden = pts < 1;
-      if (pts >= 1) setText(this.prestTxt, '+' + fmt(pts));
-      if (full && this.cardFor) this.placeCard(); // linhas podem ter aparecido/sumido acima do card
+      if (pts >= 1) setText(this.prestTxt, 'Nova noite +' + fmt(pts));
+      if (this.chatterCb && full) this.chatterCb.checked = s.chatter !== false;
     },
 
     // Floaters na camada 'hud' — único fillText do jogo. Bônus: 17px dourado.
@@ -4875,8 +5766,136 @@ window.LQ = window.LQ || {};
 })();
 </script>
 <script>
+// Lago Quieto — modo Idle: "Falatório do lago" — frases curtas assinadas pelos moradores, via LQ.Toasts (kind 'chatter').
+// Filtro por era (min) e população (LQ.Idle.visible(pop) > 0); sem repetir nas últimas 20; 1 a cada 150-300 s,
+// só com pilha vazia, ≥3 s sem clique e aba visível (1ª frase ~90 s após abrir). Vida 4 s, sem sino.
+// Respeita state.idle.chatter; soma stats.chatterShown. Pool pequeno (era 0): `recent` encolhe para nunca silenciar.
+window.LQ = window.LQ || {};
+LQ.Chatter = (function(){
+  'use strict';
+  const LQ = window.LQ;
+  const D = () => LQ.IdleData || { gens: [], eras: [] };
+  const I = () => LQ.Idle || {};
+  const MIN_GAP = 150, MAX_GAP = 300, LIFE = 4, QUIET = 3, NO_REPEAT = 20, FIRST = 90;
+  // quem fala: nome, ícone e população que precisa existir (null = sempre; era mínima em `era`)
+  const WHO = {
+    vagalume: { name: 'Vagalume', icon: 'ic-firefly', pop: 'vagalume' },
+    junco:    { name: 'Junco', icon: 'ic-reed', pop: 'juncosL' },
+    peixe:    { name: 'Peixe', icon: 'ic-fish', pop: 'peixe' },
+    estrela:  { name: 'Estrela', icon: 'ic-star', pop: 'estrelas' },
+    lua:      { name: 'Lua', icon: 'ic-moon', pop: 'lua' },
+    dourado:  { name: 'Peixe dourado', icon: 'ic-goldfish', pop: 'dourado' },
+    montanha: { name: 'Montanha', icon: 'ic-mountain', pop: 'montanhas' },
+    lirio:    { name: 'Lírio', icon: 'ic-lily', pop: 'lirio' },
+    sapo:     { name: 'Sapo', icon: 'ic-frog', pop: 'sapo' },
+    aurora:   { name: 'Aurora', icon: 'ic-aurora', pop: 'aurora' },
+    lago:     { name: 'O lago', icon: 'ic-coll', pop: null },
+    lanterna: { name: 'A lanterna', icon: 'ic-coll', pop: null, era: 1 },
+    pier:     { name: 'O píer', icon: 'ic-coll', pop: null, era: 2 },
+    barco:    { name: 'O barco', icon: 'ic-coll', pop: null, era: 3 },
+    templo:   { name: 'O templo', icon: 'ic-coll', pop: null, era: 4 },
+    passaro:  { name: 'Pássaro', icon: 'ic-bird', pop: null, era: 5 },
+  };
+  // [quem, frase]
+  const LINES = [
+    ['vagalume', 'quem apagou?'],
+    ['vagalume', 'eu era o sétimo. Agora sou o oitavo. Não sei o que aconteceu.'],
+    ['vagalume', 'pisca duas vezes se você também está com frio.'],
+    ['vagalume', 'a estrela ali em cima me copiou.'],
+    ['vagalume', 'onda vindo. Onda vindo. Todo mundo pra margem.'],
+    ['junco', 'o vento contou um segredo. Não entendi, mas balancei.'],
+    ['junco', 'hoje eu cresci um centímetro. Ninguém notou.'],
+    ['junco', 'um vagalume pousou em mim e disse que era o meu chapéu.'],
+    ['peixe', 'essa pedra tinha gosto de quinta-feira.'],
+    ['peixe', 'vi meu reflexo na lua. Precisamos conversar.'],
+    ['peixe', 'mais uma pedra e eu abro um restaurante.'],
+    ['peixe', 'o fundo do lago é só o céu de cabeça pra baixo, né?'],
+    ['estrela', 'caí uma vez. Não recomendo. Mas a vista é boa.'],
+    ['estrela', 'se piscar for cansativo, ninguém me avisou.'],
+    ['estrela', 'aquela estrela ali é um vagalume que subiu muito.'],
+    ['lua', 'estou cheia, obrigada por perguntar.'],
+    ['lua', 'todo lago quer um pedaço de mim. Este pediu com educação.'],
+    ['lua', 'meu halo não é vaidade. É neblina bem colocada.'],
+    ['dourado', 'não sou dourado. Sou bem iluminado.'],
+    ['dourado', 'as pedras deste lago são de primeira. Cinco estrelas.'],
+    ['montanha', 'eu já estava aqui. Só a névoa é que saiu.'],
+    ['montanha', 'daqui de cima o lago parece uma moeda. Uma moeda bonita.'],
+    ['lirio', 'flori de madrugada só pra ninguém ver. Deu certo.'],
+    ['lirio', 'o peixe passou por baixo e fez cócegas.'],
+    ['sapo', 'hoje eu ia coaxar, mas a lua tá bonita demais.'],
+    ['sapo', 'coaxei em dó. O lago respondeu em silêncio. Empate.'],
+    ['sapo', 'cada onda é um aplauso. Obrigado, obrigado.'],
+    ['aurora', 'eu não danço. Eu escorro devagar.'],
+    ['aurora', 'verde hoje. Amanhã vejo como acordo.'],
+    ['lago', 'toda pedra que cai eu guardo. Ainda não perdi nenhuma.'],
+    ['lago', 'silêncio também é som, só que bem espalhado.'],
+    ['lago', 'quem jogou a primeira pedra? Foi você, né? Obrigado.'],
+    ['lago', 'me chamam de quieto. Não sabem o que se passa lá embaixo.'],
+    ['lanterna', 'cinco vagalumes e eu acendo. Quatro e eu fico só com esperança.'],
+    ['lanterna', 'alguém me deixou aqui. Acho que foi de propósito.'],
+    ['lanterna', 'os vagalumes fogem das ondas. Eu sou o lugar para onde fogem.'],
+    ['pier', 'seis tábuas e nenhuma range. Sou um píer de respeito.'],
+    ['pier', 'o peixe usa a minha sombra como rede. Cobro nada.'],
+    ['barco', 'amarrado, sim. Parado, nunca: eu balanço.'],
+    ['barco', 'as luzes da outra margem me acenam. Um dia eu vou.'],
+    ['templo', 'uma janela acesa é suficiente para quem sabe olhar.'],
+    ['templo', 'a ponte veio até mim. Eu não precisei ir a lugar nenhum.'],
+    ['passaro', 'passei aqui ontem. Estava mais escuro.'],
+    ['passaro', 'o amanhecer vem de longe. Eu vim mais longe ainda.'],
+  ];
+
+  let game = null, timer = 0, recent = [];
+  const st = () => (game && game.state && game.state.idle) || null;
+  const rnd = () => (game && game.rand ? game.rand() : Math.random());
+  const nextGap = () => MIN_GAP + rnd() * (MAX_GAP - MIN_GAP);
+  function eraIdx(){
+    if (I().era){ const e = I().era(); return typeof e === 'number' ? e : (e && e.index) || 0; }
+    const s = st(); return s && typeof s.era === 'number' ? s.era : 0;
+  }
+  // frase elegível: era mínima, população viva e não dita nas últimas NO_REPEAT
+  function pool(){
+    const era = eraIdx(), elig = [];
+    for (let i = 0; i < LINES.length; i++){
+      const w = WHO[LINES[i][0]]; if (!w) continue;
+      if ((w.era || 0) > era) continue;
+      if (w.pop && I().visible && !(I().visible(w.pop) > 0)) continue;
+      elig.push(i);
+    }
+    // pool menor que a memória de repetição: esquece as mais antigas (senão silenciaria para sempre)
+    while (recent.length && recent.length >= elig.length) recent.shift();
+    return elig.filter(i => recent.indexOf(i) < 0);
+  }
+  // Solta uma frase agora (ignora timer/condições de silêncio). Retorna a frase ou null.
+  function say(){
+    if (!game || game.mode !== 'idle' || !LQ.Toasts) return null;
+    const p = pool(); if (!p.length) return null;
+    const i = p[Math.floor(rnd() * p.length)], w = WHO[LINES[i][0]];
+    recent.push(i); if (recent.length > NO_REPEAT) recent.shift();
+    if (!LQ.Toasts.show({ icon: w.icon, title: w.name, text: LINES[i][1], kind: 'chatter', life: LIFE })) return null;
+    const s = st(); if (s){ s.stats = s.stats || {}; s.stats.chatterShown = (s.stats.chatterShown || 0) + 1; }
+    return w.name + ': ' + LINES[i][1];
+  }
+  const enabled = () => { const s = st(); return !!s && s.chatter !== false; };
+
+  LQ.register('idle-chatter', {
+    init(g){ game = g; recent = []; timer = FIRST; },
+    update(dt, g){
+      if (g.mode !== 'idle' || !enabled()) return;
+      timer -= dt;
+      if (timer > 0) return;
+      // condições: pilha vazia, sem clique há ≥3 s, aba visível — senão tenta de novo em alguns segundos
+      if (document.hidden || !LQ.Toasts || !LQ.Toasts.idle() || g.sinceClick < QUIET){ timer = 5; return; }
+      timer = nextGap();
+      say();
+    },
+  });
+
+  return { say, enabled, lines: () => LINES.length, pool: () => pool().length, nextIn: () => timer };
+})();
+</script>
+<script>
 // Lago Quieto — modo Idle: brilho dourado ('idle-glints'). A cada glintEvery s nasce um ponto
-// dourado na água por glintLife s; clicar nele paga max(taxa×glintRateSec, clique×50).
+// dourado na água por glintLife s; clicar nele paga max(taxa×glintRateSec, clickPower×50).
 // Só age em game.mode === 'idle'; some ao prestigiar.
 window.LQ = window.LQ || {};
 (function(){
@@ -4893,13 +5912,10 @@ window.LQ = window.LQ || {};
     const e = BON().glintEvery || [60, 180];
     timer = e[0] + game.rand() * Math.max(0, e[1] - e[0]);
   }
-  // ponto na água (fora da loja): usa o engine se disponível, senão fórmula equivalente
+  // ponto na água (canvas todo, acima da barra): usa o engine se disponível, senão fórmula equivalente
   function lakePoint(game){
     if (typeof LQ.Idle.lakePoint === 'function'){ const p = LQ.Idle.lakePoint(); if (p && Number.isFinite(p.x)) return p; }
-    const el = document.getElementById('shop');
-    let sw = (el && el.classList.contains('open')) ? el.offsetWidth : 0; // hud marca #shop.open
-    if (sw >= game.W) sw = 0; // loja em tela cheia cobre tudo
-    return { x: 20 + game.rand() * Math.max(40, game.W - 40 - sw), y: game.horizonY + 20 + game.rand() * Math.max(10, game.H - game.horizonY - 90) };
+    return { x: 20 + game.rand() * Math.max(40, game.W - 40), y: game.horizonY + 20 + game.rand() * Math.max(10, game.H - game.horizonY - 90) };
   }
   function spawn(game){
     const p = lakePoint(game);
@@ -4933,7 +5949,6 @@ window.LQ = window.LQ || {};
       }
       if (timer < 0) nextTimer(game);
       if (document.hidden) return; // não nasce com a aba escondida
-      if (typeof LQ.Idle.shopCovers === 'function' && LQ.Idle.shopCovers()) return; // loja em tela cheia (celular): ninguém veria
       timer -= dt;
       if (timer <= 0) spawn(game);
     },

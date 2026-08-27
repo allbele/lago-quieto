@@ -5,7 +5,7 @@
 
 ## Agora
 - **JOGO NO AR:** **https://allbele.github.io/lago-quieto/** · espelho Artifact: indisponível (dois links sumiram logo após publicar; investigar depois — não bloqueia nada)
-- **Fase atual:** 8 — **Idle v3 "A Margem que Acende"** (loja persistente que não cobre o lago, clique = % do lago, eras com construções na margem, lanterna de vagalumes, toasts estilo Cookie Clicker, falatório) — *em execução* (W1 economia). Plano `PLANO-IDLE-V3.md`, estudos em `scripts/estudos/`.
+- **Fase atual:** 8 concluída ✅ — **Idle v3 "A Margem que Acende" publicado** em https://allbele.github.io/lago-quieto/ . Pendente leve: rodada extra de testes humanos/screenshots 17-20 (W3 falhou 2× por instabilidade da API/sono do Mac; W2 já validou 12/12). Steam segue aguardando a conta do usuário.
 - **Jogo:** **Lago Quieto** (*Quiet Lake*) — "Jogue uma pedra. O lago faz o resto." · slug `lago-quieto`
 - **Você precisa fazer:** nada.
 - **Próximo entregável:** upload para a Steam — só depois de você criar a conta Steamworks e me passar o App ID / Depot IDs.
@@ -54,6 +54,7 @@
 - **26/08 · W1 economia v3 concluído (4 agentes).** Simulador estendido (clickPct, perfis ativo/preguiçoso, eras, clickShare). Proposta B ajustada vence: growth 1.13/1.15/1.16 por faixa, clickPctBase 0.12 (+0.06 por Pedras pesadas, máx 48%), marcos ×1.5 em 10/25/50/100 + ×2 em 250, K=7e8. Métricas (ativo): 1ª compra 4 s · 5 distintos 2m47 · gap 11 s · aurora 44 min · taxa 30 min 60K/s · 60 min 1.08M/s · **clique 27% aos 30 min, 16% aos 60** · eras 2m47/9m44/19m50/33m/45m · prestígio 55 min. `data.js` com eras, bonus.lantern, goals novas.
 - **26/08 · W2 build v3 concluído (8 agentes, 70 min, 17 achados corrigidos).** Loja fixa 360 px (28vw) que reserva largura do canvas (lua visível), cabeçalho com total/taxa/"+N por pedra (X%)", x1/x10/x100/max, abas Moradores/Melhorias, linhas com produção total e por unidade, marcos inline; split vertical em telas estreitas. Eras com peças na margem (lanterna, píer, barco+aldeia, ponte+templo, amanhecer) + Linha da Margem; lanterna pastoreável (fuga desloca a base, janela de pastoreio 10 s, só acende por cliques do jogador; +25% 60 s); anéis automáticos não movem bichos; toasts empilhados (3) com sinos; falatório (1ª frase ~90 s); painel Margem (eras/metas/moradores). Economia: clickShare 41% aos 3 min no teste real; bônus do peixe contido (cooldown 6 s, 1 s de taxa). Bug pego pelo integrador: peças re-entravam em fade a cada load (era lida antes do motor). Commit local.
 - **27/08 02:10 · Mac dormiu de novo** (tampa fechada vence `caffeinate -i`); W3 v3 morreu com 0/5 concluídos, nada parcial no disco. Retomado às 02:10 com `caffeinate -dims`. Lição: usar `-dims` (e/ou manter a tampa aberta) em workflows longos.
+- **27/08 07:30-08:40 · W3 v3 falhou pela 2ª vez** (agentes "estagnados": API instável — o classificador da extensão Chrome também estava fora — e build Electron >10 min). Decisão: publicar o que o W2 validou. Feito à mão: bundle regenerado (323 KB com shore/toasts/chatter), build Mac refeito, textos PT/EN/README v3 (já alterados pelo agente antes de cair) conferidos, smoke tests headless T2/T3/T5 (zen intacto, layout reservado, 5 eras, console limpo). **Push realizado.**
 - Este diário criado a pedido do usuário: "salva em um .md também, atualizado dinamicamente, com lembranças do que já foi, por onde passou".
 
 ---

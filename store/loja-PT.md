@@ -17,7 +17,7 @@ Você está sentado na margem de um lago à noite, jogando pedrinhas na água se
 [b]Não há objetivo, pontuação ou derrota.[/b] O jogo nunca pede nada — ele apenas responde. Quanto mais tempo você passa ali, mais vivo o lago fica. E ele continua vivo quando você fecha a janela: ao voltar, uma cascata de anéis conta o que aconteceu enquanto você não estava.
 
 [h3]Dois modos[/h3]
-Ao abrir, você escolhe entre 🌙 [b]Zen[/b] — só clicar e observar, sem números, do jeito original — e ⚡ [b]Idle[/b], um clicker de progressão com geradores (vagalumes, peixes, lírios…), upgrades e prestígio ao amanhecer. No Idle, cada compra faz o lago crescer de verdade — mais peixes, vagalumes e juncos, montanhas ao fundo, uma lua maior. Os dois compartilham o mesmo lago; troque quando quiser.
+Ao abrir, você escolhe entre 🌙 [b]Zen[/b] — só clicar e observar, sem números, do jeito original — e ⚡ [b]Idle[/b], um clicker de progressão com geradores (vagalumes, peixes, lírios…), upgrades e prestígio ao amanhecer. No Idle, cada compra faz o lago crescer de verdade — mais peixes, vagalumes e juncos, montanhas ao fundo, uma lua maior. E a margem acende em eras: uma lanterna, depois um píer, um barco e uma aldeia, uma ponte e um templo, até o amanhecer. O que você construiu na margem fica para sempre, mesmo depois do prestígio. Os dois compartilham o mesmo lago; troque quando quiser.
 
 [h3]O que você vai encontrar[/h3]
 [list]
@@ -26,7 +26,7 @@ Ao abrir, você escolhe entre 🌙 [b]Zen[/b] — só clicar e observar, sem nú
 [*][b]Modo ambiente.[/b] Deixe aberto: a interface some, o cursor desaparece e o lago vira uma paisagem sonora viva.
 [*][b]Áudio 100% sintetizado.[/b] Nenhum sample — cada plop, grilo e nota é gerado em tempo real.
 [*][b]Zero texto na tela.[/b] Sem tutorial, sem números, sem notificações. Só ícones e água.
-[*][b]Modo Idle opcional.[/b] Geradores, upgrades e prestígio para quem quer ver o lago crescer em números — ou fique no Zen e nunca veja um. Quatro cliques bônus escondidos (um peixe come a pedra, um brilho dourado, o ritmo certo, uma estrela cadente) e a Ração para acelerar o lago.
+[*][b]Modo Idle opcional.[/b] Geradores, upgrades e prestígio para quem quer ver o lago crescer em números — ou fique no Zen e nunca veja um. Uma lanterna que você pastoreia pela margem (+25% onde ela ilumina), loja sempre à vista, clique que acompanha o ritmo do lago, avisos discretos e o falatório da aldeia. Quatro cliques bônus escondidos (um peixe come a pedra, um brilho dourado, o ritmo certo, uma estrela cadente) e a Ração para acelerar o lago.
 [/list]
 
 [h3]O que a versão Steam adiciona[/h3]
@@ -47,7 +47,7 @@ O Lago Quieto é [b]gratuito e completo na web[/b]: [url=https://allbele.github.
 3. Progressão idle gentil: o lago segue vivo enquanto você está fora.
 4. Áudio inteiramente sintetizado e visual em Canvas 2D, leve em qualquer máquina.
 5. Extras Steam: 12 conquistas, 4 temas, cloud save e modo papel de parede.
-6. Dois modos: 🌙 Zen (só clicar e observar) e ⚡ Idle (geradores, upgrades, prestígio; o lago cresce com cada compra, 4 cliques bônus, Ração).
+6. Dois modos: 🌙 Zen (só clicar e observar) e ⚡ Idle (geradores, upgrades, prestígio; o lago cresce com cada compra, a margem acende em eras — lanterna, píer, aldeia, templo, amanhecer — e fica para sempre; 4 cliques bônus, Ração).
 
 ## Requisitos de sistema
 
