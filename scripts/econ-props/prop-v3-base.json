@@ -1,0 +1,532 @@
+{
+ "name": "v3-base",
+ "clickBase": 1,
+ "clickPctBase": 0.1,
+ "gens": [
+  {
+   "id": "vagalume",
+   "icon": "ic-firefly",
+   "unlock": "fireflies",
+   "base": 8,
+   "growth": 1.15,
+   "rate": 0.25
+  },
+  {
+   "id": "juncos",
+   "icon": "ic-reed",
+   "unlock": "wind",
+   "base": 40,
+   "growth": 1.15,
+   "rate": 1.2
+  },
+  {
+   "id": "peixe",
+   "icon": "ic-fish",
+   "unlock": "fish",
+   "base": 180,
+   "growth": 1.15,
+   "rate": 5
+  },
+  {
+   "id": "estrelas",
+   "icon": "ic-star",
+   "unlock": "stars2",
+   "base": 800,
+   "growth": 1.15,
+   "rate": 20
+  },
+  {
+   "id": "lua",
+   "icon": "ic-moon",
+   "unlock": "moon",
+   "base": 3000,
+   "growth": 1.15,
+   "rate": 70
+  },
+  {
+   "id": "dourado",
+   "icon": "ic-goldfish",
+   "unlock": "fish2",
+   "base": 12000,
+   "growth": 1.15,
+   "rate": 250
+  },
+  {
+   "id": "nevoa",
+   "icon": "ic-mountain",
+   "unlock": "fog_clear",
+   "base": 55000,
+   "growth": 1.15,
+   "rate": 900
+  },
+  {
+   "id": "lirio",
+   "icon": "ic-lily",
+   "unlock": "lilies",
+   "base": 250000,
+   "growth": 1.15,
+   "rate": 3500
+  },
+  {
+   "id": "sapo",
+   "icon": "ic-frog",
+   "unlock": "frog",
+   "base": 1100000,
+   "growth": 1.15,
+   "rate": 13000
+  },
+  {
+   "id": "aurora",
+   "icon": "ic-aurora",
+   "unlock": "aurora",
+   "base": 4500000,
+   "growth": 1.15,
+   "rate": 45000
+  }
+ ],
+ "upgrades": [
+  {
+   "id": "vagalume_10",
+   "gen": "vagalume",
+   "kind": "mult",
+   "at": 10,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "vagalume_25",
+   "gen": "vagalume",
+   "kind": "mult",
+   "at": 25,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "vagalume_50",
+   "gen": "vagalume",
+   "kind": "mult",
+   "at": 50,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "vagalume_100",
+   "gen": "vagalume",
+   "kind": "mult",
+   "at": 100,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "juncos_10",
+   "gen": "juncos",
+   "kind": "mult",
+   "at": 10,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "juncos_25",
+   "gen": "juncos",
+   "kind": "mult",
+   "at": 25,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "juncos_50",
+   "gen": "juncos",
+   "kind": "mult",
+   "at": 50,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "juncos_100",
+   "gen": "juncos",
+   "kind": "mult",
+   "at": 100,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "peixe_10",
+   "gen": "peixe",
+   "kind": "mult",
+   "at": 10,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "peixe_25",
+   "gen": "peixe",
+   "kind": "mult",
+   "at": 25,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "peixe_50",
+   "gen": "peixe",
+   "kind": "mult",
+   "at": 50,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "peixe_100",
+   "gen": "peixe",
+   "kind": "mult",
+   "at": 100,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "estrelas_10",
+   "gen": "estrelas",
+   "kind": "mult",
+   "at": 10,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "estrelas_25",
+   "gen": "estrelas",
+   "kind": "mult",
+   "at": 25,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "estrelas_50",
+   "gen": "estrelas",
+   "kind": "mult",
+   "at": 50,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "estrelas_100",
+   "gen": "estrelas",
+   "kind": "mult",
+   "at": 100,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "lua_10",
+   "gen": "lua",
+   "kind": "mult",
+   "at": 10,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "lua_25",
+   "gen": "lua",
+   "kind": "mult",
+   "at": 25,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "lua_50",
+   "gen": "lua",
+   "kind": "mult",
+   "at": 50,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "lua_100",
+   "gen": "lua",
+   "kind": "mult",
+   "at": 100,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "dourado_10",
+   "gen": "dourado",
+   "kind": "mult",
+   "at": 10,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "dourado_25",
+   "gen": "dourado",
+   "kind": "mult",
+   "at": 25,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "dourado_50",
+   "gen": "dourado",
+   "kind": "mult",
+   "at": 50,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "dourado_100",
+   "gen": "dourado",
+   "kind": "mult",
+   "at": 100,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "nevoa_10",
+   "gen": "nevoa",
+   "kind": "mult",
+   "at": 10,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "nevoa_25",
+   "gen": "nevoa",
+   "kind": "mult",
+   "at": 25,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "nevoa_50",
+   "gen": "nevoa",
+   "kind": "mult",
+   "at": 50,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "nevoa_100",
+   "gen": "nevoa",
+   "kind": "mult",
+   "at": 100,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "lirio_10",
+   "gen": "lirio",
+   "kind": "mult",
+   "at": 10,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "lirio_25",
+   "gen": "lirio",
+   "kind": "mult",
+   "at": 25,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "lirio_50",
+   "gen": "lirio",
+   "kind": "mult",
+   "at": 50,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "lirio_100",
+   "gen": "lirio",
+   "kind": "mult",
+   "at": 100,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "sapo_10",
+   "gen": "sapo",
+   "kind": "mult",
+   "at": 10,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "sapo_25",
+   "gen": "sapo",
+   "kind": "mult",
+   "at": 25,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "sapo_50",
+   "gen": "sapo",
+   "kind": "mult",
+   "at": 50,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "sapo_100",
+   "gen": "sapo",
+   "kind": "mult",
+   "at": 100,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "aurora_10",
+   "gen": "aurora",
+   "kind": "mult",
+   "at": 10,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "aurora_25",
+   "gen": "aurora",
+   "kind": "mult",
+   "at": 25,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "aurora_50",
+   "gen": "aurora",
+   "kind": "mult",
+   "at": 50,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "aurora_100",
+   "gen": "aurora",
+   "kind": "mult",
+   "at": 100,
+   "cost": 0,
+   "value": 1.5
+  },
+  {
+   "id": "click_1",
+   "gen": null,
+   "kind": "click",
+   "at": null,
+   "cost": 15,
+   "value": 2,
+   "pct": 0.04
+  },
+  {
+   "id": "click_2",
+   "gen": null,
+   "kind": "click",
+   "at": null,
+   "cost": 150,
+   "value": 2,
+   "pct": 0.04
+  },
+  {
+   "id": "click_3",
+   "gen": null,
+   "kind": "click",
+   "at": null,
+   "cost": 1500,
+   "value": 2,
+   "pct": 0.04
+  },
+  {
+   "id": "click_4",
+   "gen": null,
+   "kind": "click",
+   "at": null,
+   "cost": 15000,
+   "value": 2,
+   "pct": 0.04
+  },
+  {
+   "id": "click_5",
+   "gen": null,
+   "kind": "click",
+   "at": null,
+   "cost": 150000,
+   "value": 2,
+   "pct": 0.04
+  },
+  {
+   "id": "click_6",
+   "gen": null,
+   "kind": "click",
+   "at": null,
+   "cost": 1500000,
+   "value": 2,
+   "pct": 0.04
+  },
+  {
+   "id": "auto_1",
+   "gen": null,
+   "kind": "auto",
+   "at": null,
+   "cost": 800,
+   "value": 1
+  },
+  {
+   "id": "auto_2",
+   "gen": null,
+   "kind": "auto",
+   "at": null,
+   "cost": 40000,
+   "value": 2
+  },
+  {
+   "id": "offline_12h",
+   "gen": null,
+   "kind": "offline",
+   "at": null,
+   "cost": 15000,
+   "value": 12
+  },
+  {
+   "id": "offline_18h",
+   "gen": null,
+   "kind": "offline",
+   "at": null,
+   "cost": 300000,
+   "value": 18
+  },
+  {
+   "id": "offline_24h",
+   "gen": null,
+   "kind": "offline",
+   "at": null,
+   "cost": 4000000,
+   "value": 24
+  }
+ ],
+ "prestige": {
+  "K": 250000000
+ },
+ "eras": [
+  {
+   "id": "escuro",
+   "life": 0
+  },
+  {
+   "id": "acordado",
+   "life": 500
+  },
+  {
+   "id": "vivo",
+   "life": 20000
+  },
+  {
+   "id": "profundo",
+   "life": 500000
+  },
+  {
+   "id": "lendario",
+   "life": 10000000
+  },
+  {
+   "id": "amanhecer",
+   "life": 300000000
+  }
+ ]
+}
