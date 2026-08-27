@@ -10,11 +10,20 @@ LQ.IdleState = (function(){
 
   function fresh(){
     return {
-      v: 1, cur: 0, life: 0, gens: {}, ups: [],
+      v: 2, cur: 0, life: 0, gens: {}, ups: [],
       prest: { pts: 0, runs: 0, mult: 1 },
       goals: [], lastTick: 0,
-      stats: { clicks: 0, offlineEarned: 0, bestRate: 0, purchases: 0, bonuses: {}, bonusSeen: {} }
+      era: 0,        // índice em IdleData.eras (derivado de life; nunca regride)
+      chatter: true, // toggle "Falatório do lago"
+      stats: { clicks: 0, offlineEarned: 0, bestRate: 0, purchases: 0, bonuses: {}, bonusSeen: {}, chatterShown: 0, seenGens: {} }
     };
+  }
+  // era pelo life acumulado: maior índice cujo limiar foi atingido
+  function eraFor(life){
+    const eras = (LQ.IdleData && LQ.IdleData.eras) || [];
+    let e = 0;
+    for (let i = 0; i < eras.length; i++) if (life >= num(eras[i].life, Infinity)) e = i;
+    return e;
   }
 
   function migrate(s){
@@ -33,6 +42,9 @@ LQ.IdleState = (function(){
     const goalIds = D.goals.map(g => g.id);
     out.goals = Array.isArray(s.goals) ? Array.from(new Set(s.goals.filter(x => idOk(x) && goalIds.indexOf(x) >= 0))) : [];
     out.lastTick = pos(s.lastTick);
+    // era: recalculada de life (save v1 não tinha); nunca menor que a gravada
+    out.era = Math.max(Math.min(int(s.era), Math.max(0, ((D.eras || []).length || 1) - 1)), eraFor(out.life));
+    out.chatter = s.chatter === undefined ? true : !!s.chatter;
     const st = s.stats && typeof s.stats === 'object' ? s.stats : {};
     out.stats.clicks = int(st.clicks); out.stats.offlineEarned = pos(st.offlineEarned);
     out.stats.bestRate = pos(st.bestRate); out.stats.purchases = int(st.purchases);
@@ -44,7 +56,12 @@ LQ.IdleState = (function(){
     out.stats.bonusSeen = {};
     if (st.bonusSeen && typeof st.bonusSeen === 'object' && !Array.isArray(st.bonusSeen))
       for (const k in st.bonusSeen) if (idOk(k) && st.bonusSeen[k]) out.stats.bonusSeen[k] = true;
-    out.v = 1;
+    out.stats.chatterShown = int(st.chatterShown);
+    // geradores já anunciados na loja (toast "novo morador")
+    out.stats.seenGens = {};
+    if (st.seenGens && typeof st.seenGens === 'object' && !Array.isArray(st.seenGens))
+      for (const k in st.seenGens) if (idOk(k) && st.seenGens[k]) out.stats.seenGens[k] = true;
+    out.v = 2;
     return out;
   }
 
@@ -73,5 +90,5 @@ LQ.IdleState = (function(){
     }
   });
 
-  return { fresh, migrate, reconcile };
+  return { fresh, migrate, reconcile, eraFor };
 })();

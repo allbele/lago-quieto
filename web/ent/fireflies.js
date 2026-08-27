@@ -1,14 +1,21 @@
 // Vagalumes — zen: 5 com 'fireflies', 15 com 'fireflies2'; idle: população por LQ.Idle.visible('vagalume') (até 30).
-// Movimento = soma de 2 senos, pulso 2-4 s. Glow via game.sprite.glow na camada 'light'. Fogem 30 px do
-// anel (ease 600 ms) e brilham 2 s com tilintar; clique = pulso + nota uma oitava acima. Alguns pousam nas
-// pontas dos juncos e, com 3+ pousados próximos, linhas finas de constelação (alpha 0.15) ligam-os.
+// Movimento = soma de 2 senos, pulso 2-4 s. Glow via game.sprite.glow na camada 'light'. Fogem 40 px do
+// anel (ease 600 ms; a fuga desloca a base — o vagalume NÃO volta) e brilham 2 s com tilintar; clique = pulso
+// + nota uma oitava acima. Alguns pousam nas pontas dos juncos e, com 3+ pousados próximos, linhas finas de
+// constelação (alpha 0.15) ligam-os.
+// Idle: lanterna (LQ.shore.lantern()) — pastoreio: só quem fugiu de um anel do jogador há <10 s (f.herd) é
+// atraído (<150 px) e capturado pela zona; dentro fica imune ao anel por 10 s e orbita; com `need` dentro
+// (ou needPct dos vivos) a lanterna acende: bônus, buff de taxa e todos dispersam. Deriva natural não acende.
 window.LQ = window.LQ || {};
 (function(){
   'use strict';
   const LQ = window.LQ;
   const MAX = 30, BASE = 5, ZEN_MAX = 15;
-  const FLEE_R = 150, FLEE_D = 30, FLEE_T = 0.6, SHINE_T = 2.0;
+  const FLEE_R = 150, FLEE_D = 40, FLEE_T = 0.6, SHINE_T = 2.0;
   const HIT_R = 16, CONST_R = 110;
+  const SAFE_T = 10, AWAY_T = 6, DISPERSE_D = 70, LANTERN_GLOW = '#e8b04a';
+  const HERD_T = 10, ATTR_R = 150, ATTR_K = 1.8; // janela de pastoreio após anel do jogador; raio e força da atração
+  let inside = 0;    // vagalumes orbitando a lanterna neste frame
   const flies = [];
   let lastChime = -1e9, constAlpha = 0, constTimer = 0, lastN = 0;
   const pairs = [];   // pares ligados por linhas de constelação
@@ -40,6 +47,8 @@ window.LQ = window.LQ || {};
       state: 0, perch: null, st: 0, land: 0, px: 0, py: 0,    // 0 voa, 1 pousando, 2 pousado, 3 decolando
       sx: 0, sy: 0, wait: 8 + rnd() * 20,                     // origem do pouso; espera até tentar pousar
       fpx: 0, fpy: 0,                                         // última posição livre (freePos)
+      safe: 0, away: 0, orbA: 0, orbR: 0,                     // lanterna: imunidade/órbita; 'away' evita recaptura
+      herd: 0, baked: true,                                   // pastoreio: s desde o último anel do jogador; fuga já fixada na base
       born: -1                                                // game.t do nascimento (fade)
     };
   }
@@ -61,6 +70,35 @@ window.LQ = window.LQ || {};
     if (now - lastChime < 0.15) return;   // quase subliminar, nunca em rajada
     lastChime = now;
     game.audio.play('firefly', { x: x / game.W, gain: g });
+  }
+
+  // sai da zona sem salto: base vai `off`·W para fora e o retorno da fuga (1,5 s) leva até lá
+  function leave(f, zone, W, H, game, off){
+    const dx = f.x - zone.x, dy = f.y - zone.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
+    const ox = dx / d * off * W, oy = dy / d * off * W * 0.5;
+    f.bx = Math.min(0.98, Math.max(0.02, (f.x + ox) / W));
+    f.by = Math.min(0.9, Math.max(0.05, (f.y + oy - game.horizonY) / (H - game.horizonY)));
+    f.fx = f.x - f.bx * W; f.fy = f.y - (game.horizonY + f.by * (H - game.horizonY));
+    f.flee = FLEE_T; f.safe = 0; f.away = AWAY_T; f.herd = 0; f.baked = true; // volta suave (branch de retorno), sem re-atração
+  }
+  // lanterna acesa: sino, bônus (max(taxa×rateSec, clique×clickMult)), buff de taxa (aldeia/templo por era) e dispersão
+  function lightUp(zone, n, game, LB){
+    const I = LQ.Idle, D = LQ.IdleData || {}, Bn = D.bonus || {};
+    const era = LQ.shore.era ? LQ.shore.era() : 1;
+    const amount = Math.max((I.totalRate ? I.totalRate() : 0) * (LB.rateSec || 90), (I.clickPower ? I.clickPower() : 0) * (LB.clickMult || 40));
+    if (I.bonus) I.bonus('lantern', { x: zone.x, y: zone.y - 20, amount });
+    // buffs somam no motor: lanterna sempre; aldeia (era 3+) e templo (era 4+) acendem junto
+    if (typeof I.setBuff === 'function'){
+      I.setBuff(LB.buff || 0.25, LB.buffSec || 60, 'lantern');
+      if (era >= 3 && Bn.village) I.setBuff(Bn.village.buff, LB.buffSec || 60, 'village');
+      if (era >= 4 && Bn.temple) I.setBuff(Bn.temple.buff, LB.buffSec || 60, 'temple');
+    }
+    game.audio.play('unlock', { degree: 4, x: zone.x / game.W, gain: 1 });
+    for (let i = 0; i < n; i++){
+      const f = flies[i];
+      if (f.safe > 0){ f.shine = 0; leave(f, zone, game.W, game.H, game, 0.16); }
+    }
+    inside = 0;
   }
 
   const def = {
@@ -91,12 +129,23 @@ window.LQ = window.LQ || {};
       const W = game.W, H = game.H;
       // pousar nos juncos: fase 6 (fireflies2, §3) ou, no idle, marco de 5 vagalumes comprados
       const canPerch = game.has('fireflies2') || gc(game, 'vagalume') >= 5;
+      const LZ = game.mode === 'idle' && LQ.shore && LQ.shore.lantern ? LQ.shore.lantern() : null;
+      const zone = LZ && LZ.r > 0 ? LZ : null;
+      inside = 0;
       for (let i = 0; i < MAX; i++){
         const f = flies[i];
         if (i >= n || f.born < 0 || t < f.born) continue;
         if (f.woke === false){ f.woke = true; freePos(f, game); chime(game, f.fpx, 1); }
         f.flee += dt; f.shine += dt;
+        if (f.herd > 0) f.herd -= dt;
         f.bx += f.drift * dt; if (f.bx < 0.02 || f.bx > 0.98) f.drift = -f.drift;
+        // fuga terminou: o deslocamento vira base (o vagalume fica onde o anel o empurrou)
+        if (!f.baked && f.flee >= FLEE_T){
+          f.baked = true;
+          f.bx = Math.min(0.98, Math.max(0.02, f.bx + f.fx / W));
+          f.by = Math.min(0.9, Math.max(0.05, f.by + f.fy / Math.max(1, H - game.horizonY)));
+          f.fx = 0; f.fy = 0;
+        }
         freePos(f, game);
 
         if (f.state === 0){
@@ -126,7 +175,30 @@ window.LQ = window.LQ || {};
             f.p1 = -t * f.f1; f.p2 = -t * f.f2; f.p3 = -t * f.f1 * 1.3; f.p4 = -t * f.f2 * 0.8;
           }
         }
-        // Fuga do anel: 30 px em 600 ms, depois volta devagar
+        // Lanterna: dentro da zona → imune 4 s e orbita; ao expirar, sai devagar (via retorno da fuga)
+        if (f.away > 0) f.away -= dt;
+        if (zone && f.state === 0){
+          const dx = f.x - zone.x, dy = f.y - zone.y, d2 = dx * dx + dy * dy;
+          const herded = f.herd > 0 && f.safe <= 0 && f.away <= 0;
+          // pastoreado e perto: a base desliza para a lanterna (o anel só precisa aproximar)
+          if (herded && d2 < ATTR_R * ATTR_R && d2 >= zone.r * zone.r){
+            f.bx -= dx / W * ATTR_K * dt; f.by -= dy / Math.max(1, H - game.horizonY) * ATTR_K * dt;
+          }
+          if (herded && d2 < zone.r * zone.r){ f.safe = SAFE_T; f.orbA = Math.atan2(dy, dx); f.orbR = Math.sqrt(d2); }
+          if (f.safe > 0){
+            f.safe -= dt;
+            f.orbA += dt * 1.6; f.orbR += (zone.r * 0.55 - f.orbR) * Math.min(1, dt * 1.5);
+            f.x = zone.x + Math.cos(f.orbA) * f.orbR; f.y = zone.y + Math.sin(f.orbA) * f.orbR * 0.7;
+            // base acompanha (sem salto quando a imunidade acabar)
+            f.bx = Math.min(0.98, Math.max(0.02, f.x / W));
+            f.by = Math.min(0.9, Math.max(0.05, (f.y - game.horizonY) / (H - game.horizonY)));
+            f.p1 = -t * f.f1; f.p2 = -t * f.f2; f.p3 = -t * f.f1 * 1.3; f.p4 = -t * f.f2 * 0.8;
+            f.fx = 0; f.fy = 0; f.flee = 10;
+            if (f.safe <= 0) leave(f, zone, W, H, game, 0.12); else inside++;
+            continue;
+          }
+        } else if (f.safe > 0) f.safe = 0;
+        // Fuga do anel: 40 px em 600 ms (depois a base absorve); retorno lento só na saída da lanterna (leave)
         if (f.flee < FLEE_T){
           const k = game.ease.easeOutQuad(f.flee / FLEE_T);
           f.x += f.fx * k; f.y += f.fy * k;
@@ -134,6 +206,13 @@ window.LQ = window.LQ || {};
           const k = 1 - (f.flee - FLEE_T) / 1.5;
           f.x += f.fx * k; f.y += f.fy * k;
         }
+      }
+
+      // Lanterna acende: need dentro (ou needPct dos vivos, o menor; mínimo 2)
+      if (zone && zone.armed && inside > 0){
+        const LB = (LQ.IdleData && LQ.IdleData.bonus && LQ.IdleData.bonus.lantern) || {};
+        const need = Math.max(2, Math.min(LB.need || 5, Math.ceil((LB.needPct || 0.3) * n)));
+        if (inside >= need && LQ.shore.light()) lightUp(zone, n, game, LB);
       }
 
       // Constelação: 3+ pousados a <110 px entre si (zen: fireflies2; idle: marco de 10 vagalumes)
@@ -183,6 +262,12 @@ window.LQ = window.LQ || {};
         ctx.stroke();
       }
 
+      // Halo da lanterna enquanto houver vagalume dentro da zona
+      if (inside > 0 && LQ.shore && LQ.shore.lantern){
+        const z = LQ.shore.lantern();
+        if (z.r > 0){ ctx.globalAlpha = 0.12 * dayFade; ctx.fillStyle = LANTERN_GLOW; ctx.beginPath(); ctx.arc(z.x, z.y, z.r, 0, Math.PI * 2); ctx.fill(); }
+      }
+
       ctx.fillStyle = P.light;
       for (let i = 0; i < n; i++){
         const f = flies[i];
@@ -207,18 +292,22 @@ window.LQ = window.LQ || {};
       ctx.globalAlpha = 1;
     },
 
-    // Anel: quem está a <150 px foge 30 px e brilha 2 s (tilintar)
-    onRipple(x, y, game){
+    // Anel: quem está a <150 px foge 40 px (a base acompanha) e brilha 2 s (tilintar); abre a janela de pastoreio.
+    // Anéis automáticos (meta.auto) não espantam; vagalumes na lanterna (safe) são imunes.
+    onRipple(x, y, game, meta){
+      if (meta && meta.auto) return;
       const n = alive(game);
       let any = false;
       for (let i = 0; i < n; i++){
         const f = flies[i];
-        if (f.born < 0 || game.t < f.born) continue;
+        if (f.born < 0 || game.t < f.born || f.safe > 0) continue;
         const dx = f.x - x, dy = f.y - y, d2 = dx * dx + dy * dy;
         if (d2 > FLEE_R * FLEE_R || d2 < 1) continue;
         const d = Math.sqrt(d2);
+        // fuga anterior ainda em curso: fixa o que já andou antes de empurrar de novo
+        if (!f.baked){ const k = game.ease.easeOutQuad(Math.min(1, f.flee / FLEE_T)); f.bx = Math.min(0.98, Math.max(0.02, f.bx + f.fx * k / game.W)); f.by = Math.min(0.9, Math.max(0.05, f.by + f.fy * k / Math.max(1, game.H - game.horizonY))); }
         f.fx = dx / d * FLEE_D; f.fy = dy / d * FLEE_D;
-        f.flee = 0; f.shine = 0; any = true;
+        f.flee = 0; f.shine = 0; f.baked = false; f.herd = HERD_T; any = true;
       }
       if (any) chime(game, x, 0.5);
     },
@@ -245,5 +334,5 @@ window.LQ = window.LQ || {};
 
   LQ.register('fireflies', def);
   // leitura (depuração/testes/outras entidades): lista do pool e quantos estão vivos agora
-  LQ.fireflies = { list: flies, alive: () => (LQ.game ? alive(LQ.game) : 0) };
+  LQ.fireflies = { list: flies, alive: () => (LQ.game ? alive(LQ.game) : 0), inside: () => inside };
 })();

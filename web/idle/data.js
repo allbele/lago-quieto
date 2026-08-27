@@ -107,10 +107,10 @@ LQ.IdleData = {
     montanhas: {base:2,  k:1,  cap:4},
     aurora:    {bands2At:10},
   },
-  // Bônus ativos: peixe come pedra (max(clique, taxa×fishRateSec) × 2/3/4), brilhos, combo, cadente;
+  // Bônus ativos: peixe come pedra (max(clique, taxa×fishRateSec) × 2/3/4; cooldown 6 s por peixe em fish.js), brilhos, combo, cadente;
   // lantern: zona da lanterna (raio px, need vagalumes ou needPct dos vivos, buff +25% por buffSec, cooldown; prêmio max(taxa×rateSec, clique×clickMult));
   // village/temple: buff extra da aldeia (era 3) e do templo (era 4).
-  bonus: {"fishMult":2,"fishMult10":3,"racaoMult":4,"glintEvery":[60,180],"glintLife":6,"glintRateSec":60,"fishRateSec":4,"comboStep":0.1,"comboCap":2,"comboTol":0.12,"comboMin":0.3,"comboMax":1.5,"shootMult":25,"shootLife":3.5,"shootRadius":40,
+  bonus: {"fishMult":2,"fishMult10":3,"racaoMult":4,"glintEvery":[60,180],"glintLife":6,"glintRateSec":60,"fishRateSec":1,"comboStep":0.1,"comboCap":2,"comboTol":0.12,"comboMin":0.3,"comboMax":1.5,"shootMult":25,"shootLife":3.5,"shootRadius":40,
            "lantern":{"radius":45,"need":5,"needPct":0.3,"buff":0.25,"buffSec":60,"cooldown":90,"rateSec":90,"clickMult":40},
            "village":{"buff":0.35},"temple":{"buff":0.5}},
   goals: [

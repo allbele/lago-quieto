@@ -24,7 +24,8 @@ LQ.Platform = (function(){
     // modo Idle (metas de idle/data.js, prefixo idle_)
     idle_primeira_onda: 'ACH_IDLE_FIRST_WAVE', idle_vagalumes_acordam: 'ACH_IDLE_FIREFLIES', idle_cardume: 'ACH_IDLE_SCHOOL',
     idle_lua_cheia: 'ACH_IDLE_FULL_MOON', idle_mil_ondas: 'ACH_IDLE_MILLION_WAVES', idle_lago_vivo: 'ACH_IDLE_LAKE_ALIVE',
-    idle_mare_alta: 'ACH_IDLE_HIGH_TIDE', idle_nova_noite: 'ACH_IDLE_NEW_NIGHT'
+    idle_mare_alta: 'ACH_IDLE_HIGH_TIDE', idle_nova_noite: 'ACH_IDLE_NEW_NIGHT',
+    idle_guardiao_lanterna: 'ACH_IDLE_LANTERN_KEEPER', idle_tres_eras: 'ACH_IDLE_THREE_ERAS', idle_ouvinte: 'ACH_IDLE_LISTENER'
   };
 
   function localAch(){ try { return JSON.parse(localStorage.getItem(ACH_KEY) || '[]'); } catch (e) { return []; } }

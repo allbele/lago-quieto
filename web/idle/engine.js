@@ -1,4 +1,4 @@
-// Lago Quieto — modo Idle: motor da economia (taxa, compras, upgrades, metas, offline, anéis automáticos).
+// Lago Quieto — modo Idle: motor da economia v3 (taxa, pedra = fixa + % do lago, buffs, eras, metas, offline, anéis decorativos).
 // API pública em LQ.Idle; a entidade 'idle-engine' só age quando game.mode === 'idle'.
 window.LQ = window.LQ || {};
 LQ.Idle = (function(){
@@ -35,11 +35,11 @@ LQ.Idle = (function(){
   function mults(){
     const s = S(); const key = s ? s.ups.length : -1;
     if (cache && key === cacheKey) return cache;
-    const c = { gen: {}, click: 1, auto: 0, offlineH: 8 };
+    const c = { gen: {}, click: 1, pct: 0, auto: 0, offlineH: 8 };
     for (const u of D().upgrades){
       if (!has(u.id)) continue;
       if (u.kind === 'mult') c.gen[u.gen] = (c.gen[u.gen] || 1) * u.value;
-      else if (u.kind === 'click') c.click *= u.value;
+      else if (u.kind === 'click'){ c.click *= u.value; c.pct += u.pct || 0; }
       else if (u.kind === 'auto') c.auto += u.value;
       else if (u.kind === 'offline') c.offlineH = Math.max(c.offlineH, u.value);
     }
@@ -51,18 +51,42 @@ LQ.Idle = (function(){
   function clickMult(){ return mults().click; }
   function autoClicks(){ return mults().auto; }
   function globalMult(){ const s = S(); return s ? s.prest.mult : 1; }
-  // ondas/s vindas dos geradores
+  // fração da taxa que cada pedra rende: clickPctBase + Σ pct das Pedras pesadas compradas
+  function clickPct(){ return (D().clickPctBase || 0) + mults().pct; }
+  // Buffs temporários (lanterna/aldeia/templo): não salvos; rate() × (1 + Σ mult ativos)
+  let buffs = [];
+  function buffMult(){ let m = 1; for (const b of buffs) m += b.mult; return m; }
+  function setBuff(mult, sec, id){
+    mult = Number(mult); sec = Number(sec);
+    if (!(mult > 0) || !(sec > 0)) return false;
+    buffs.push({ mult, left: sec, total: sec, id: id || 'buff' });
+    emit('buff', { mult, sec, id: id || 'buff', total: buffMult() });
+    return true;
+  }
+  function tickBuffs(dt){
+    if (!buffs.length) return;
+    let ended = false;
+    for (const b of buffs){ b.left -= dt; if (b.left <= 0) ended = true; }
+    if (ended){ buffs = buffs.filter(b => b.left > 0); emit('buff', { mult: 0, sec: 0, id: 'end', total: buffMult() }); }
+  }
+  function clearBuffs(){ buffs = []; }
+  // ondas/s vindas dos geradores (com prestígio e buffs)
   function rate(){
     const s = S(); if (!s) return 0;
     let r = 0;
     for (const g of D().gens){ const n = s.gens[g.id] || 0; if (n) r += n * g.rate * genMult(g.id); }
-    return r * globalMult();
+    return r * globalMult() * buffMult();
   }
+  // taxa sem buffs temporários (metas e recorde não contam picos de lanterna/aldeia/templo)
+  function baseRate(){ return rate() / buffMult(); }
   // taxa por unidade de um gerador (com os mults do gerador; sem prestígio)
   function genRate(id){ const g = gen(id); return g ? g.rate * genMult(id) : 0; }
-  function clickPower(){ return (D().clickBase || 1) * clickMult() * globalMult(); }
-  // taxa total exibível (geradores + auto-clique)
-  function totalRate(){ return rate() + autoClicks() * clickPower(); }
+  // parte fixa da pedra (o Orvalho/auto paga só isto)
+  function clickFixed(){ return (D().clickBase || 1) * clickMult() * globalMult(); }
+  // pedra = (fixa + clickPct·taxa) · combo  (rate() já traz prestígio e buffs)
+  function clickPower(){ return (clickFixed() + clickPct() * rate()) * combo; }
+  // taxa total exibível (geradores + auto-clique na parte fixa)
+  function totalRate(){ return rate() + autoClicks() * clickFixed(); }
   // teto offline em segundos (8 h base; upgrades kind 'offline' em horas)
   function offlineCap(){ return mults().offlineH * 3600; }
   function genCost(id, n){
@@ -111,18 +135,14 @@ LQ.Idle = (function(){
     const halo = hMin + (hMax - hMin) * ((scale - 1) / Math.max(1e-6, cap - 1));
     return { scale, halo };
   }
-  // Largura da loja aberta (0 fechada), lida só ao abrir/fechar/redimensionar (offsetWidth força layout)
-  let shopW = 0;
-  function refreshShopW(){
-    const el = document.getElementById('shop');
-    shopW = el && el.classList.contains('open') ? el.offsetWidth : 0;
-  }
-  // Ponto aleatório na água, fora do painel da loja e acima da barra (H-90)
-  // Loja em tela cheia (≤600px: shopW ≥ W) cobre tudo: ignora-a (senão x degenera para [20,60], atrás do painel)
-  const shopCovers = () => shopW > 0 && game && shopW >= game.W;
+  // A loja nunca cobre o canvas (layout reservado via --shop-w): largura coberta é sempre 0.
+  // Mantidos por compatibilidade (sky.js/glints.js leem shopWidth/shopCovers).
+  const shopW = 0;
+  function refreshShopW(){ return 0; }
+  const shopCovers = () => false;
+  // Ponto aleatório na água: canvas todo, acima da barra (H-90)
   function lakePoint(){
-    const sw = shopCovers() ? 0 : shopW;
-    const x = 20 + game.rand() * Math.max(40, game.W - 40 - sw);
+    const x = 20 + game.rand() * Math.max(40, game.W - 40);
     const y = game.horizonY + 20 + game.rand() * Math.max(10, game.H - game.horizonY - 90);
     return { x, y };
   }
@@ -158,6 +178,26 @@ LQ.Idle = (function(){
     prevDt = inRange ? dtc : -1;
   }
   function resetCombo(){ lastStoneT = -1; prevDt = -1; setCombo(1); }
+
+  // ---------- Eras "A Margem que Acende" ----------
+  // índice da era pelo life acumulado (nunca menor que o gravado em s.era)
+  function era(){
+    const s = S(); if (!s) return 0;
+    const eras = D().eras || []; let e = 0;
+    for (let i = 0; i < eras.length; i++) if (s.life >= eras[i].life) e = i;
+    return Math.max(e, s.era || 0);
+  }
+  function eraInfo(i){ const eras = D().eras || []; return eras[i === undefined ? era() : i] || null; }
+  // subiu de era → grava e emite 'era' (uma emissão por era, em ordem)
+  function checkEra(){
+    const s = S(); if (!s || prestigeBusy()) return;
+    const target = era(), eras = D().eras || [];
+    while ((s.era || 0) < target){
+      s.era = (s.era || 0) + 1;
+      const e = eras[s.era];
+      if (e) emit('era', { index: s.era, id: e.id, name: e.name, piece: e.piece, toast: e.toast, gens: e.gens || [] });
+    }
+  }
   // ração comprada → pedra vira 3 pontinhos (game.js desenha)
   function syncStoneStyle(){ if (game) game.stoneStyle = has('racao') ? 'racao' : 'stone'; }
 
@@ -197,7 +237,7 @@ LQ.Idle = (function(){
         // marco automático: sino curto para o salto de taxa não passar em silêncio
         const gi = D().gens.findIndex(g => g.id === u.gen);
         if (game && game.audio) game.audio.play('unlock', { degree: (gi < 0 ? 0 : gi) % 5, gain: 0.8 });
-        emit('upgrade', { id: u.id, kind: 'mult', auto: true, gen: u.gen, value: u.value });
+        emit('upgrade', { id: u.id, kind: 'mult', auto: true, gen: u.gen, value: u.value, at: u.at });
       }
     }
   }
@@ -215,7 +255,7 @@ LQ.Idle = (function(){
     const pts = prestigePoints(); if (pts < 1) return false;
     s.prest.pts += pts; s.prest.runs++; s.prest.mult = 1 + 0.1 * s.prest.pts;
     frozenGens = Object.assign({}, s.gens);
-    s.cur = 0; s.gens = {};
+    s.cur = 0; s.gens = {}; clearBuffs(); // life fica → eras nunca regridem
     s.ups = s.ups.filter(id => { const u = upgrade(id); return u && u.kind === 'offline'; }); // teto offline é permanente
     invalidate(); resetCombo(); syncStoneStyle(); // ração não é permanente → volta a pedra
     emit('prestige', { pts, total: s.prest.pts, runs: s.prest.runs, mult: s.prest.mult });
@@ -242,8 +282,11 @@ LQ.Idle = (function(){
       case 'clicks': return s.stats.clicks >= c.value;
       case 'gens': return genCount(c.id) >= c.value;
       case 'life': return s.life >= c.value;
-      case 'rate': return rate() >= c.value;
+      case 'rate': return baseRate() >= c.value;
       case 'prestige': return s.prest.runs >= c.value;
+      case 'bonus': return ((s.stats.bonuses || {})[c.id] || 0) >= c.value;
+      case 'era': return era() >= c.value;
+      case 'chatter': return (s.stats.chatterShown || 0) >= c.value;
       default: return false;
     }
   }
@@ -260,13 +303,11 @@ LQ.Idle = (function(){
   // ---------- Entidade ----------
   let goalTimer = 0, ringAcc = 0;
   LQ.register('idle-engine', {
-    init(g){ game = g; invalidate(); frozenGens = null; if (g.mode !== 'idle') return; const s = S(); if (s) s.lastTick = Date.now(); applyMilestones(); syncStoneStyle(); refreshShopW(); },
-    // o núcleo chama call('onResize', game): largura da loja pode ter mudado (≤600px = tela cheia)
-    onResize(g){ if (g && g.mode === 'idle') refreshShopW(); },
+    init(g){ game = g; invalidate(); frozenGens = null; clearBuffs(); if (g.mode !== 'idle') return; const s = S(); if (s){ s.lastTick = Date.now(); if (s.era === undefined) s.era = 0; s.era = Math.max(s.era, era()); } applyMilestones(); syncStoneStyle(); },
     update(dt, g){
       if (g.mode !== 'idle') return; const s = S(); if (!s) return;
-      const r = rate(), auto = autoClicks();
-      const tr = r + auto * clickPower();
+      tickBuffs(dt);
+      const tr = totalRate();
       // Relógio de parede: o núcleo limita dt a 0.05 s; com rAF estrangulado (janela coberta, wallpaper
       // a 15 fps) o tempo real passa mais rápido que a soma dos dt → creditamos a diferença.
       // Gaps longos (> 2 s) valem 50% como offline; teto = offlineCap.
@@ -282,30 +323,30 @@ LQ.Idle = (function(){
       const gain = tr * dt;
       s.cur += gain; s.life += gain;
       clampState(s);
-      if (tr > s.stats.bestRate) s.stats.bestRate = tr;
+      const trBase = tr - rate() + baseRate(); // recorde sem buffs
+      if (trBase > s.stats.bestRate) s.stats.bestRate = trBase;
       goalTimer += dt;
-      if (goalTimer >= 1){ goalTimer = 0; checkGoals(); }
+      if (goalTimer >= 1){ goalTimer = 0; checkEra(); checkGoals(); }
       // ritmo quebrado por silêncio → arco do HUD apaga sem esperar o próximo clique
       if (combo > 1 && lastStoneT >= 0 && performance.now() / 1000 - lastStoneT > (B().comboMax || 1.5)) resetCombo();
-      // anéis visuais da automação: spawnRipple não passa por impact() → não gera moeda nem conta ripple
+      // anéis decorativos da automação (≤1/s, auto:true → peixes/vagalumes ignoram; não passam por impact())
       if (tr > 0 && !document.hidden){
-        const f = U.clamp(0.5 + Math.log10(tr + 1) / 2, 0.3, 3); // spawns/s
+        const f = U.clamp(0.25 + Math.log10(tr + 1) / 6, 0.25, 1); // spawns/s
         ringAcc += f * dt;
-        let n = 0;
-        while (ringAcc >= 1 && n < 3){
-          ringAcc -= 1; n++;
-          const pt = lakePoint(); // fora da loja aberta e acima da barra
-          g.spawnRipple(pt.x, pt.y, { strength: U.clamp(0.3 + Math.log10(Math.max(1, tr)) / 8, 0.3, 0.9) });
+        if (ringAcc >= 1){
+          ringAcc -= 1;
+          const pt = lakePoint();
+          g.spawnRipple(pt.x, pt.y, { strength: U.clamp(0.3 + Math.log10(Math.max(1, tr)) / 8, 0.3, 0.7), auto: true });
         }
-        if (ringAcc > 3) ringAcc = 0;
+        if (ringAcc > 2) ringAcc = 0;
       } else ringAcc = 0;
     },
     // moeda SÓ aqui (pedra/lírio/sapo → impact); anéis automáticos nunca chegam neste hook
     onImpact(p, g){
       if (g.mode !== 'idle' || prestigeBusy()) return; const s = S(); if (!s) return; // durante os sinos do prestígio nada soma
-      let amt = clickPower() * (p && p.strength ? p.strength : 1);
-      // pedra: cadência regular multiplica (combo)
-      if (p && p.source === 'stone'){ stepCombo(Number.isFinite(p.t) ? p.t : performance.now() / 1000); amt *= combo; }
+      // pedra: cadência regular multiplica (combo já entra em clickPower)
+      if (p && p.source === 'stone') stepCombo(Number.isFinite(p.t) ? p.t : performance.now() / 1000);
+      const amt = clickPower() * (p && p.strength ? p.strength : 1);
       s.cur += amt; s.life += amt; s.stats.clicks++; clampState(s);
       emit('currency', { x: p ? p.x : g.W / 2, y: p ? p.y : g.horizonY + 40, amount: amt, source: p && p.source, combo });
     },
@@ -318,16 +359,16 @@ LQ.Idle = (function(){
       s.lastTick = Date.now(); // evita creditar a mesma ausência de novo no próximo update
       if (sec >= 30) emit('offline', { sec, earned, capped: sec > eff });
     },
-    // loja aberta/fechada: o hud alterna .open no mesmo emit (talvez depois de nós) → lê no próximo tick
-    onShopToggle(){ setTimeout(refreshShopW, 0); }
   });
 
   return {
-    rate, totalRate, autoClicks, clickPower, offlineCap, globalMult,
+    rate, baseRate, totalRate, autoClicks, clickPower, clickFixed, clickPct, offlineCap, globalMult,
+    era, eraInfo, checkEra, setBuff, buffs: () => buffs.map(b => ({ mult: b.mult, left: b.left, total: b.total, id: b.id })), buffMult,
+    stats: () => { const s = S(); return s ? s.stats : null; },
     gen, upgrade, genCount, genMult, genRate, genCost, maxBuy, canBuy, buy, save,
     upgradeAvailable, canBuyUpgrade, buyUpgrade, has,
     prestigePoints, claimPrestige, checkGoals,
-    visible, moon, lakePoint, shopWidth: () => shopW, shopCovers, bonus, combo: () => combo, resetCombo,
+    visible, moon, lakePoint, refreshShopW, shopWidth: () => shopW, shopCovers, bonus, combo: () => combo, resetCombo,
     on, off, emit,
     get state(){ return S(); }
   };

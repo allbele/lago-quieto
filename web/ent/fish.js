@@ -11,6 +11,7 @@
   const N_NORMAL = 8, N_GOLD = 3; // pool: normais 0..7, dourados 8..10
   const EAT_T = 2.2;         // janela para alcançar a pedra (s)
   const JUMP_CD = 6;         // s mínimos entre saltos do mesmo peixe (anéis não viram chuva de saltos)
+  const EAT_CD = 6;          // s mínimos entre refeições do mesmo peixe (o bônus não domina a economia)
   const JUMP_SND_GAP = 1;    // s mínimos entre sons 'fishJump' (global; o dourado/refeição sempre toca)
   const UI_BAND = 72;        // px acima da borda inferior reservados à barra de ícones
   let lastJumpSnd = -1e9;
@@ -39,7 +40,7 @@
       p0: null, p1: null, p2: null, p3: null, u: 0, dur: 6,   // curva atual
       pull: null, pullT: 0,                                    // atração ao anel
       target: null, ate: false, shown: -1,                     // pedra a comer; salto de refeição; t em que apareceu (idle)
-      jumping: 0, jx: 0, jy: 0, jumped: false, jumpTimer: 0, jumpCd: 0, pullJump: false, // pullJump: atração veio de pedra (clique) → pode saltar ao chegar
+      jumping: 0, jx: 0, jy: 0, jumped: false, jumpTimer: 0, jumpCd: 0, eatCd: 0, pullJump: false, // pullJump: atração veio de pedra (clique) → pode saltar ao chegar
       diving: 0, dx: 0, dy: 0, tx: 0, ty: 0, born: false };
     for (let i = 0; i < TRAIL; i++) f.trail.push({ x: 0, y: 0 });
     return f;
@@ -87,7 +88,7 @@
   }
   // Idle: peixe alcançou a pedra → salto dourado e bônus (×2; ×3 com 10 peixes; ×4 com ração)
   function eat(f, game){
-    f.ate = true;
+    f.ate = true; f.eatCd = EAT_CD;
     startJump(f, game);
     try {
       const B = (LQ.IdleData && LQ.IdleData.bonus) || {};
@@ -179,6 +180,7 @@
         f.alpha = 0.35 * fadeOf(f, game);
         if (!f.p0) newPath(f, game);
         if (f.jumpCd > 0) f.jumpCd -= dt;
+        if (f.eatCd > 0) f.eatCd -= dt;
 
         // Mergulho (clique): invisível, reaparece adiante
         if (f.diving > 0){
@@ -251,7 +253,8 @@
         }
       }
     },
-    onRipple(x, y, game){
+    onRipple(x, y, game, meta){
+      if (meta && meta.auto) return; // anel automático do idle: decoração, não arrasta peixe
       const act = activeIdx(game);
       let best = null, bd = CURVE_R;
       for (const i of act){
@@ -284,7 +287,7 @@
       let best = null, bd = CURVE_R;
       for (const i of act){
         const f = fish[i];
-        if (f.jumping || f.diving || !f.born || hasTarget(f, game)) continue;
+        if (f.jumping || f.diving || !f.born || hasTarget(f, game) || f.eatCd > 0) continue; // em cooldown: não come
         const d = Math.hypot(f.x - p.x, (f.y - p.y) * 1.5);
         if (d < bd){ bd = d; best = f; }
       }

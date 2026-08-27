@@ -11,10 +11,10 @@ window.LQ = window.LQ || {};
     const e = { name, def };
     if (i >= 0) ents[i] = e; else ents.push(e);
   };
-  function call(hook, a, b, c){
+  function call(hook, a, b, c, d){
     for (let i = 0; i < ents.length; i++){
       const f = ents[i].def[hook];
-      if (f) f.call(ents[i].def, a, b, c);
+      if (f) f.call(ents[i].def, a, b, c, d);
     }
   }
   // Hash determinístico barato (0..1) por índice inteiro — jitter estável entre frames
@@ -216,7 +216,8 @@ window.LQ = window.LQ || {};
     game.eco = !!game.state.eco;
     const dpr = clamp(window.devicePixelRatio || 1, 1, game.eco ? 1 : 1.5);
     game.dpr = dpr;
-    game.W = window.innerWidth; game.H = window.innerHeight;
+    // área do lago = o que o CSS reservou ao canvas (a loja idle fica ao lado/embaixo, nunca por cima)
+    game.W = Math.max(1, canvas.clientWidth || window.innerWidth); game.H = Math.max(1, canvas.clientHeight || window.innerHeight);
     game.horizonY = Math.round(game.H * 0.40);
     canvas.width = Math.round(game.W * dpr); canvas.height = Math.round(game.H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -327,7 +328,8 @@ window.LQ = window.LQ || {};
     r.strength = opts.strength !== undefined ? opts.strength : 1;
     r.rings = clamp(Math.round(opts.rings !== undefined ? opts.rings : (r.strength < 0.5 ? 1 : r.strength < 0.8 ? 2 : 3)) || 1, 1, 3);
     activeRipples++;
-    if (!opts.silent) call('onRipple', x, y, game); // silent: anel de bônus não acorda os moradores
+    // silent: anel de bônus não acorda os moradores; meta.auto: anel decorativo da automação (peixes/vagalumes ignoram)
+    if (!opts.silent) call('onRipple', x, y, game, { auto: !!opts.auto });
     return r;
   }
   const RING_DELAY = [0, 0.12, 0.24], RING_A0 = [1, 0.6, 0.35];
@@ -444,7 +446,8 @@ window.LQ = window.LQ || {};
         stones.splice(i, 1);
         if (st.dew){
           // gota de orvalho: anel menor, sem contar ripple
-          spawnRipple(st.x, st.y, { strength: 0.55, rings: 2 });
+          // idle: auto → não empurra vagalumes nem arrasta peixes (só o jogador pastoreia); zen mantém
+          spawnRipple(st.x, st.y, { strength: 0.55, rings: 2, auto: game.mode === 'idle' });
           spawnDrops(st.x, st.y, 2);
           game.audio.play('dew', { x: st.x / game.W, y: 0.5, gain: 1 });
         } else impact(st.x, st.y);
@@ -677,7 +680,6 @@ window.LQ = window.LQ || {};
         clearTimeout(UI.modeTimer); UI.modeArmed = false; if (b) b.classList.remove('arm');
         LQ.switchMode(game.mode === 'idle' ? 'zen' : 'idle'); return;
       }
-      else if (a === 'shop'){ game.emit('shopToggle', null); } // idle/hud.js implementa onShopToggle
       UI.applyClasses(); save();
     },
     applyClasses(){
@@ -705,7 +707,46 @@ window.LQ = window.LQ || {};
       for (const ic of icons){
         html += '<svg class="' + (ic === newIcon && !silent ? 'new' : '') + '"><use href="#ic-' + ic + '"/></svg>';
       }
+      // Idle: painel "Margem" — linha 1 eras (silhuetas), linha 2 metas, linha 3 moradores (zen: só a faixa)
+      const isIdle = game.mode === 'idle' && LQ.IdleData && s.idle;
+      el.classList.toggle('margem', !!isIdle);
+      if (isIdle){
+        const D = LQ.IdleData, eras = D.eras || [];
+        const era = LQ.Idle && LQ.Idle.era ? (typeof LQ.Idle.era() === 'number' ? LQ.Idle.era() : s.idle.era || 0) : (s.idle.era || 0);
+        // silhuetas SVG (viewBox 24): lanterna, píer, barco, ponte, templo, sol — cada uma ligada a uma era
+        const SIL = [
+          { era: 1, nome: 'Lanterna', d: 'M9 4h6M10 4v3h4V4M8 7h8l1 9H7z|M12 9v5|M11 16v4h2v-4' },
+          { era: 2, nome: 'Píer', d: 'M3 12h16|M5 12v6M9 12v6M13 12v6M17 12v6|M19 12l2-2' },
+          { era: 3, nome: 'Barco', d: 'M4 13l2 4h12l2-4z|M12 4v9|M12 4l5 7h-5' },
+          { era: 4, nome: 'Ponte', d: 'M2 16c3-7 17-7 20 0|M2 16h20|M7 16v-3M12 16v-4M17 16v-3' },
+          { era: 4, nome: 'Templo', d: 'M4 10l8-5 8 5|M6 10v9h12v-9|M10 19v-4h4v4|M12 13h.01' },
+          { era: 5, nome: 'Sol', d: 'M4 16a8 8 0 0 1 16 0|M2 16h20|M12 4v2M5 7l1.5 1.5M19 7l-1.5 1.5' },
+        ];
+        const fmt = LQ.IdleUtil && LQ.IdleUtil.fmt ? LQ.IdleUtil.fmt : v => String(v);
+        let m = '<div class="mrow eras">';
+        for (const p of SIL){
+          const e = eras[p.era] || {}, ok = era >= p.era, cur = era === p.era;
+          const title = (e.name || p.nome) + ' · ' + p.nome + (ok ? '' : ' — a partir de ' + fmt(e.life || 0) + ' ondas');
+          m += '<svg class="' + (ok ? (cur ? 'cur' : 'ok') : 'lock') + '" viewBox="0 0 24 24"><title>' + title + '</title>';
+          for (const seg of p.d.split('|')) m += '<path d="' + seg + '"/>';
+          m += '</svg>';
+        }
+        // linha de texto: era atual → próxima e limiar (as silhuetas só têm tooltip; no toque nada nomeava a era)
+        const curE = eras[era] || {}, nxtE = eras[era + 1];
+        m += '</div><div class="mtxt">' + (nxtE ? (curE.name || '') + ' → ' + nxtE.name + ' em ' + fmt(nxtE.life || 0) + ' ondas' : (curE.name || '') + ' · a margem está completa') + '</div>';
+        m += '<div class="msep"></div><div class="mrow goals">';
+        const NOME = { primeira_onda: 'Primeira onda', vagalumes_acordam: 'Vagalumes acordam', cardume: 'Cardume', lua_cheia: 'Lua cheia', mil_ondas: 'Um milhão de ondas', lago_vivo: 'Lago vivo', mare_alta: 'Maré alta', nova_noite: 'Nova noite', guardiao_lanterna: 'Guardião da Lanterna', tres_eras: 'Três eras', ouvinte: 'Ouvinte' };
+        for (const g of D.goals || []){
+          const on = s.idle.goals && s.idle.goals.indexOf(g.id) >= 0;
+          const nm = (NOME[g.id] || g.id) + (on ? '' : ' — apagada');
+          m += '<svg class="' + (on ? 'on' : 'off') + '" data-n="' + nm + '"><title>' + nm + '</title><use href="#' + (g.icon || 'ic-coll') + '"/></svg>';
+        }
+        m += '</div><div class="msep"></div>';
+        html = m + '<div class="mrow gens">' + html + '</div>';
+      }
       el.innerHTML = html;
+      // toque/clique numa meta: o nome aparece na linha de texto (sem depender do tooltip do mouse)
+      if (isIdle && !el._mtap){ el._mtap = true; el.addEventListener('click', e => { const t = e.target.closest && e.target.closest('[data-n]'); const x = el.querySelector('.mtxt'); if (t && x){ x.textContent = t.dataset.n; e.stopPropagation(); } }); }
       // morador novo: a faixa aparece sozinha por alguns segundos (fade, sem texto)
       if (newIcon && !silent && !UI.collOpen){
         el.classList.add('open');
@@ -868,6 +909,9 @@ window.LQ = window.LQ || {};
     }
     canvas = document.getElementById('lake');
     ctx = canvas.getContext('2d', { alpha: false });
+    // classe do modo antes do 1º resize: o CSS reserva a área da loja (idle) e o canvas já nasce no tamanho certo
+    document.body.classList.toggle('mode-zen', game.mode === 'zen');
+    document.body.classList.toggle('mode-idle', game.mode === 'idle');
     resize();
     updateDayCycle();
     game.palette = targetPalette(); paletteDirty = true;

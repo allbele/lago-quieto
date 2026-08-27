@@ -13,9 +13,10 @@
 <!-- Coleção: faixa com ícones dos moradores acordados (sem texto) -->
 <div id="collection" aria-hidden="true"></div>
 
-<!-- Idle: HUD (moeda/taxa) e loja lateral — preenchidos por idle/hud.js -->
+<!-- Idle: HUD (anel/combo/taxa), pilha de toasts e loja sempre visível (ao lado ou embaixo do lago) — preenchidos por idle/hud.js -->
 <div id="hud"></div>
-<aside id="shop"></aside>
+<div id="toasts" aria-live="polite"></div>
+<aside id="shop" aria-label="Loja do lago"></aside>
 
 <!-- Barra inferior de ícones -->
 <div id="ui">
@@ -39,17 +40,12 @@
     <svg class="to-idle" viewBox="0 0 24 24"><path d="M13 2.5L5 13.5h6l-1 8 9-11.5h-6l1-7.5z"/></svg>
     <svg class="to-zen" viewBox="0 0 24 24"><path d="M15 3.5a9 9 0 1 0 5.5 14.5A8 8 0 0 1 15 3.5z"/></svg>
   </button>
-  <!-- Loja (só idle): anel / ondas concêntricas -->
-  <button class="ico" id="btn-shop" data-act="shop">
-    <svg viewBox="0 0 24 24"><ellipse cx="12" cy="13" rx="3" ry="1.2"/><ellipse cx="12" cy="13" rx="6.5" ry="2.6"/><ellipse cx="12" cy="13" rx="10" ry="4"/></svg>
-  </button>
 </div>
 <style>
-/* Botões de modo/loja: visibilidade por body.mode-zen / body.mode-idle */
-#btn-mode .to-zen,#btn-shop{display:none}
+/* Botão de modo: visibilidade por body.mode-zen / body.mode-idle */
+#btn-mode .to-zen{display:none}
 body.mode-idle #btn-mode .to-idle{display:none}
 body.mode-idle #btn-mode .to-zen{display:inline}
-body.mode-idle #btn-shop{display:inline-block}
 </style>
 
 <!-- Ícones dos moradores (templates para a coleção) -->
@@ -81,11 +77,14 @@ body.mode-idle #btn-shop{display:inline-block}
 <script src="ent/sky.js"></script>
 <script src="ent/fog.js"></script>
 <script src="ent/themes.js"></script>
+<script src="ent/shore.js"></script>
 <script src="idle/util.js"></script>
 <script src="idle/state.js"></script>
 <script src="idle/data.js"></script>
 <script src="idle/engine.js"></script>
+<script src="idle/toasts.js"></script>
 <script src="idle/hud.js"></script>
+<script src="idle/chatter.js"></script>
 <script src="idle/glints.js"></script>
 <script src="idle/prestige.js"></script>
 <script>LQ.boot();</script>

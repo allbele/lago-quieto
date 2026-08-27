@@ -1,5 +1,5 @@
 // Lago Quieto — modo Idle: brilho dourado ('idle-glints'). A cada glintEvery s nasce um ponto
-// dourado na água por glintLife s; clicar nele paga max(taxa×glintRateSec, clique×50).
+// dourado na água por glintLife s; clicar nele paga max(taxa×glintRateSec, clickPower×50).
 // Só age em game.mode === 'idle'; some ao prestigiar.
 window.LQ = window.LQ || {};
 (function(){
@@ -16,13 +16,10 @@ window.LQ = window.LQ || {};
     const e = BON().glintEvery || [60, 180];
     timer = e[0] + game.rand() * Math.max(0, e[1] - e[0]);
   }
-  // ponto na água (fora da loja): usa o engine se disponível, senão fórmula equivalente
+  // ponto na água (canvas todo, acima da barra): usa o engine se disponível, senão fórmula equivalente
   function lakePoint(game){
     if (typeof LQ.Idle.lakePoint === 'function'){ const p = LQ.Idle.lakePoint(); if (p && Number.isFinite(p.x)) return p; }
-    const el = document.getElementById('shop');
-    let sw = (el && el.classList.contains('open')) ? el.offsetWidth : 0; // hud marca #shop.open
-    if (sw >= game.W) sw = 0; // loja em tela cheia cobre tudo
-    return { x: 20 + game.rand() * Math.max(40, game.W - 40 - sw), y: game.horizonY + 20 + game.rand() * Math.max(10, game.H - game.horizonY - 90) };
+    return { x: 20 + game.rand() * Math.max(40, game.W - 40), y: game.horizonY + 20 + game.rand() * Math.max(10, game.H - game.horizonY - 90) };
   }
   function spawn(game){
     const p = lakePoint(game);
@@ -56,7 +53,6 @@ window.LQ = window.LQ || {};
       }
       if (timer < 0) nextTimer(game);
       if (document.hidden) return; // não nasce com a aba escondida
-      if (typeof LQ.Idle.shopCovers === 'function' && LQ.Idle.shopCovers()) return; // loja em tela cheia (celular): ninguém veria
       timer -= dt;
       if (timer <= 0) spawn(game);
     },
